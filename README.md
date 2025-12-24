@@ -1,6 +1,6 @@
 <!-- PROJECT_NAME: The name of the project (e.g., "UpdateController", "GameServerManager") -->
 
-# {{PROJECT_NAME}}
+# TF2 Dodgeball Practice Bot
 
 <!-- SHORT_DESCRIPTION: A single sentence describing what the project does and its primary purpose -->
 <!-- Example: "A Kubernetes controller written in Go that automatically manages updates for Team Fortress 2 (TF2) game servers running in a cluster." -->
