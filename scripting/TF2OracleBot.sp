@@ -52,9 +52,9 @@ public void OnPluginStart()
 	RegAdminCmd("sm_pvb", PVB_Cmd, ADMFLAG_GENERIC, "Toggle command for dodgeball bot.");
 	RegConsoleCmd("sm_votepvb", VotePvB_Cmd);
 
-	g_CvarPVBenable = CreateConVar("tfdb_pvb_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
-	g_CvarVoteCooldown = CreateConVar("tfdb_pvb_vote_cooldown", "120", "Voting timeout for PVB.", _, true, 0.0);
-	g_CvarBotTeam = CreateConVar("tfdb_bot_team", "2", "The default team for the bot, 2 - Red, 3 - Blu", _, true, 2.0, true, 3.0);
+	g_CvarPVBenable = CreateConVar("tfdb_bot_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
+	g_CvarVoteCooldown = CreateConVar("tfdb_bot_vote_cooldown", "120", "Cooldown time for the voting command.", _, true, 0.0);
+	g_CvarBotTeam = CreateConVar("tfdb_bot_team", "2", "The default team for the bot, 2 - Red, 3 - Blu.", _, true, 2.0, true, 3.0);
 	g_CvarBotAutoJoin = CreateConVar("tfdb_bot_autojoin", "1", "Enable/ disable autojoin for bot when a player joins the server.", _, true, 0.0, true, 1.0);
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
