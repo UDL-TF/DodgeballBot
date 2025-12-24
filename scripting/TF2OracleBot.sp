@@ -30,7 +30,6 @@ float g_fTargetPositions[2][3];
 bool g_bChoiceAngle 	= false;
 bool g_bAttack 			= false;
 bool g_bDeflectPause 	= true;
-bool g_bOrbit			= false;
 
 float g_fPVBVoteTime = 0.0;
 
@@ -134,7 +133,6 @@ public void OnGameFrame()
 	if (!g_bEnable && iBot == -1) return;
 
 	float fBotPosition[3], fRocketPosition[3];
-	float a[3], b[3];
 	g_bAttack = false;
 
 	int iIndex = -1;
@@ -151,10 +149,6 @@ public void OnGameFrame()
 		{
 			float fAngle[3], fBotRocket[3];
 			MakeAngle(fRocketPosition, fBotPosition, fAngle);
-
-			NormalizeVector(fBotPosition, a);
-			NormalizeVector(fRocketPosition, b);
-			a[2] = b[2] = 0.0;
 
 			if ((GetVectorDistance(fBotPosition, fRocketPosition) <= g_iDeflectRadius && GetAngleToTarget(iBot, iRocket) <= g_fRandomAngle/2)
 				|| GetVectorDistance(fBotPosition, fRocketPosition) <= g_iCriticalDefRadius)
@@ -173,27 +167,9 @@ public void OnGameFrame()
 			else
 			{
 				MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
-				if (g_bOrbit)
-				{
-					float radian = DegToRad(110.0);
-					//CPrintToChatAll("%.4f", radian);
-
-					if (fBotRocket[0] < 0 || fBotRocket[1] < 0)
-					{
-						radian *= -1.0;
-					}
-					//CPrintToChatAll("modified: %.4f", radian);
-
-					float x = fBotRocket[0], y = fBotRocket[1]; //CPrintToChatAll("x: %.4f	y: %.4f", x, y);
-					fBotRocket[0] = x * Cosine(radian) - y * Sine(radian);
-					fBotRocket[1] = x * Sine(radian) + y * Cosine(radian);
-					//CPrintToChatAll("modified x: %.4f	y: %.4f", fBotRocket[0], fBotRocket[1]);
-
-					ScaleVector(fBotRocket, -6000.0);
-				}
 
 				fBotRocket[2] = 0.0;
-				if (!g_bOrbit) ScaleVector(fBotRocket, 6000.0);
+				ScaleVector(fBotRocket, 9000.0);
 				TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
 			}
 		}
@@ -256,14 +232,13 @@ public void OnGameFrame()
 		{
 			CreateTimer(0.1, Timer_ResetState); // I don't know why we have to wait 0.1 but ig it works
 
-			RocketState State = TFDB_GetRocketState(iIndex); //GetVectorDotProduct(a, b) > Cosine(DegToRad(30.0))
 			if (GetRandomInt(1, 3) == 3 && GetAngleToTarget(iBot, iRocket) > 30.0)
 			{
 				g_iDeflectRadius = 0;
 				g_iCriticalDefRadius = 40;
-				g_bOrbit = true;
-				CPrintToChatAll("orbit");
-				CreateTimer(2.5, Timer_ResetDistance);
+
+				//CPrintToChatAll("orbit");
+				CreateTimer(GetRandomFloat(1.0, 2.5), Timer_ResetDistance);
 			}
 			else	
 			{
@@ -319,7 +294,6 @@ public Action Timer_ResetDistance(Handle hTimer)
 {
 	g_iDeflectRadius = 285;
 	g_iCriticalDefRadius = 100;
-	g_bOrbit = false;
 
 	return Plugin_Stop;
 }
