@@ -36,6 +36,7 @@ float g_fPVBVoteTime = 0.0;
 ConVar g_CvarPVBenable;
 ConVar g_CvarVoteCooldown;
 ConVar g_CvarBotTeam;
+ConVar g_CvarBotAutoJoin;
 
 public Plugin myinfo = 
 {
@@ -54,6 +55,7 @@ public void OnPluginStart()
 	g_CvarPVBenable = CreateConVar("tfdb_pvb_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
 	g_CvarVoteCooldown = CreateConVar("tfdb_pvb_vote_cooldown", "120", "Voting timeout for PVB.", _, true, 0.0);
 	g_CvarBotTeam = CreateConVar("tfdb_bot_team", "2", "The default team for the bot, 2 - Red, 3 - Blu", _, true, 2.0, true, 3.0);
+	g_CvarBotAutoJoin = CreateConVar("tfdb_bot_autojoin", "1", "Enable/ disable autojoin for bot when a player joins the server.", _, true, 0.0, true, 1.0);
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("object_deflected", OnObjectDeflected);
@@ -80,9 +82,17 @@ public void OnMapEnd()
 
 public void OnClientDisconnect(int iClient)
 {
-	if (iClient == iBot || GetRealClientCount() == 0)
+	if ((iClient == iBot || GetRealClientCount() == 0) && g_bEnable)
 	{
 		DisableMode();
+	}
+}
+
+public void OnClientPutInServer(int iClient)
+{
+	if (g_CvarBotAutoJoin.BoolValue && GetRealClientCount() == 1 && !g_bEnable)
+	{
+		EnableMode();
 	}
 }
 
