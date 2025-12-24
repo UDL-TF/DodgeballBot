@@ -5,8 +5,6 @@
 <!-- SHORT_DESCRIPTION: A single sentence describing what the project does and its primary purpose -->
 <!-- Example: "A Kubernetes controller written in Go that automatically manages updates for Team Fortress 2 (TF2) game servers running in a cluster." -->
 
-{{SHORT_DESCRIPTION}}
-
 <!-- If projects needs badges use them, below is a example that could be used. -->
 <!-- GO_VERSION: The minimum or target Go version (e.g., "1.25", "1.21") -->
 <!-- LICENSE: License type (e.g., "MIT", "Apache-2.0", "GPL-3.0") -->
@@ -21,9 +19,18 @@
     tf_bot_autojoin         "1"     - Enable/ disable autojoin for bot when a player joins the server.
 ```
 # Requirements
-- [Multi-Colors](https://github.com/Bara/Multi-Colors) (compile only).
-- [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) it's a mandatory requirement not just for compiling also for functioning.
+- [Multi-Colors](https://github.com/Bara/Multi-Colors) only for compiling.
+- [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) is a mandatory requirement not just for compiling also for functioning.
 
 # Installation
-Copy the (ex. `Sourcemod`) folder into `tf/addons`
-Make sure the `dodgeball_bot_targets` config file is in `tf/addons/confis/dodgeball`
+Copy the `plugins` folder into `tf/addons/plugins` and `configs` folder into `tf/addons/configs`.
+Make sure the `dodgeball_bot_targets` config file is in `tf/addons/confis/dodgeball`.
+
+# Features
+This bot plugin aims to reproduce most of the movement a typical player does. This enables players to practice the playstyle that fits them most.
+It can move around on maps (only exception if the map is not centered around (0;0;0) or has places where it can fall down), or you can also choose to fix the bot to a specific coordinate.
+In the config file I'll try to include predefined coordinates for most maps that the "player mimic" function would not be ideal.
+
+# Credits
+- Bot core functions (Movement and flick) is based on Elite's work.
+- Map target position functions added by Benedevil.
