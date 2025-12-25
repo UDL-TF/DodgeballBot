@@ -30,8 +30,11 @@ float g_fTargetPositions[2][3];
 bool g_bChoiceAngle 	= false;
 bool g_bAttack 			= false;
 bool g_bDeflectPause 	= true;
+bool g_bBotFixed		= false;
 
 float g_fPVBVoteTime = 0.0;
+
+char g_strBotName[MAX_NAME_LENGTH];
 
 ConVar g_CvarPVBenable;
 ConVar g_CvarVoteCooldown;
@@ -67,7 +70,7 @@ public void OnPluginStart()
 
 public void OnConfigsExecuted()
 {
-	CheckForMapTargetPosition();
+	ParseConfig();
 }
 
 public void OnMapStart()
@@ -192,7 +195,7 @@ public void OnGameFrame()
 
 			if (!IsValidClient(iPlayer, false, false)) return;
 
-			if (!(GetVectorDistance(fTargetPosition, NULL_VECTOR) <= 1.0)) // Here it's used to store the target position on the map
+			if (g_bBotFixed)
 			{
 				MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
 				NormalizeVector(fNewPoint, fNewPoint);
@@ -242,7 +245,7 @@ public void OnGameFrame()
 		{
 			CreateTimer(0.1, Timer_ResetState); // I don't know why we have to wait 0.1 but ig it works
 
-			if (GetRandomInt(1, 3) == 3 && GetAngleToTarget(iBot, iRocket) > 30.0)
+			if (GetRandomInt(1, 3) == 3 && GetAngleToTarget(iBot, iRocket) > 30.0 && !g_bBotFixed)
 			{
 				g_iDeflectRadius = 0;
 				g_iCriticalDefRadius = 40;
@@ -382,7 +385,7 @@ void EnableMode()
 	ServerCommand("sm_cvar tf_bot_quota_mode normal");
 	ServerCommand("sm_cvar tf_bot_quota 0");
 	ServerCommand("mp_autoteambalance 0");
-	ServerCommand("tf_bot_add 1 Pyro red easy \"Oracle BOT\"");
+	ServerCommand("tf_bot_add 1 Pyro red easy \"%s\"", g_strBotName);
 	ServerCommand("tf_bot_difficulty 0");
 	ServerCommand("tf_bot_keep_class_after_death 1");
 	ServerCommand("tf_bot_taunt_victim_chance 0");
@@ -400,6 +403,7 @@ void DisableMode()
 	iBot = -1;
 	g_iWeapon = -1;
 	g_bEnable = false;
+	g_bBotFixed = false;
 
 	DestroyBot();
 
@@ -500,32 +504,57 @@ public void VotePVBResultCallBack(Menu hMenu, int iNumVotes, int iNumClients, co
 	}
 }
 
-void CheckForMapTargetPosition()
+void ParseConfig()
 {
+	if (!TFDB_IsDodgeballEnabled() && !g_CvarPVBenable.BoolValue) return;
+
 	ResetTargetPositions();
 
-	char cfg[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, cfg, sizeof(cfg), "configs/dodgeball/dodgeball-bot-targets.cfg");
+	char strPath[PLATFORM_MAX_PATH];
+	BuildPath(Path_SM, strPath, sizeof(strPath), "configs/dodgeball/dodgeball_bot.cfg");
+
+	if (!FileExists(strPath, true)) return;
 
 	KeyValues kv = new KeyValues("DodgeballBot");
-	if (!kv.ImportFromFile(cfg))
-	{
-		LogError("No DodgeballBot Config found in path '%s'. Taking the rocket spawn locations", cfg);
-		delete kv;
-		return;
-	}
+
+	if (!kv.ImportFromFile(strPath)) SetFailState("No Dodgeball bot config found in path '%s'", strPath);
 
 	if (!kv.GotoFirstSubKey(false))
 	{
-		LogError("Invalid DodgeballBot Config found in path '%s'. Taking the rocket spawn locations", cfg);
+		LogError("Invalid DodgeballBot Config found in path '%s'. Taking the rocket spawn locations", strPath);
 		delete kv;
 		return;
 	}
 
+	do
+	{
+		char strConfigSection[64]; kv.GetSectionName(strConfigSection, sizeof(strConfigSection));
+
+		if (StrEqual(strConfigSection, "general")) 		ParseGeneral(kv);
+		else if (StrEqual(strConfigSection, "maps")) 	ParseMaps(kv);
+	}
+	while(kv.GotoNextKey());
+
+	delete kv;
+
+	if (!(GetVectorDistance(g_fTargetPositions[0], NULL_VECTOR) <= 1.0 && GetVectorDistance(g_fTargetPositions[1], NULL_VECTOR) <= 1.0))
+	{
+		g_bBotFixed = true;
+	}
+}
+
+void ParseGeneral(KeyValues kv)
+{
+	kv.GetString("name", g_strBotName, sizeof(g_strBotName));
+}
+
+void ParseMaps(KeyValues kv)
+{
 	char sMapName[128];
 	GetCurrentMap(sMapName, sizeof(sMapName));
 	// PrintToChatAll(sMapName);
 
+	kv.GotoFirstSubKey();
 	do
 	{
 		char sConfigSectionName[128];
@@ -558,7 +587,7 @@ void CheckForMapTargetPosition()
 	}
 	while (kv.GotoNextKey(false));
 
-	delete kv;
+	kv.GoBack();
 }
 
 float[] GetTargetPosition(int iClient)
