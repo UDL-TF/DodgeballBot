@@ -13,23 +13,34 @@
 
 # Convars
 ```ini
-    tfdb_bot_enable           "1"     - Enable/disable player vs bot mode.
-    tfdb_bot_vote_cooldown    "120"   - Cooldown time for the voting command.
-    tfdb_bot_team             "2"     - The default team for the bot, 2 - Red, 3 - Blu.
-    tfdb_bot_autojoin         "1"     - Enable/ disable autojoin for bot when a player joins the server.
+    tf_dodgeball_bot_enable           "1"     - Toggle player vs bot mode.
+    tf_dodgeball_bot_vote_cooldown    "120"   - Cooldown time for the voting command.
+    tf_dodgeball_bot_team             "3"     - The default team for the bot, 2 - Red, 3 - Blu.
+    tf_dodgeball_bot_autojoin         "1"     - Enable/disable autojoin for bot when a player joins the server.
+    tf_dodgeball_bot_cleanbots        "1"     - Should this plugin kick bots when it's not active?
 ```
 # Requirements
 - [Multi-Colors](https://github.com/Bara/Multi-Colors) only for compiling.
 - [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) is a mandatory requirement not just for compiling also for functioning.
 
 # Installation
-Copy the `plugins` folder into `tf/addons/sourcemod/plugins` and `configs` folder into `tf/addons/sourcemod/configs`.
-In the `translations` folder the `tfdb_bot.phrases`'s contents go into `tfdb.phrases`.
+Copy the extra phrases from `extra_translations.txt` into the `tfdb.phrases.txt` file.
+
+# Commands
+- sm_pvb : Toggles Player vs. Bot mode.
+- sm_votepvb : Starts a vote to toggle Player vs. Bot mode.
 
 # Features
 This bot plugin aims to reproduce most of the movement a typical player does, this enables players to practice the playstyle that fits them most.
 It can move around on maps (only exception if the map is not centered around (0;0;0) coordinate or has places where it can fall down), or you can also choose to fix the bot to a specific coordinate.
-In the config file I'll try to include predefined coordinates for most maps where the "player mimic" function would not be ideal.
+In the config file I'll try to include predefined coordinates for most maps to fix the bot where the "player mimic" function would not be ideal.
+
+When you are alone on the server you are able to vote to enable the bot without the cooldown.
+
+# Issues
+It's not comletetly unbeatable, there are (very) few instances where it tries to orbit a rocket that is not actually orbitable. But it's currently getting worked on!
+
+Can't play against multiple players, sadly tf2's built in AI overwrites the angle where the bot is looking and causing it to miss rockets.
 
 # Credits
 - Bot core functions (movement and flick) is based on Elite's work.
