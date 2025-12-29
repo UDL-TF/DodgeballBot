@@ -1,0 +1,28 @@
+"Phrases"
+{
+	"PVB_Mode_Disabled"
+	{
+		"en"        "[{olive}TFDB{default}] {blue}Player{orange} vs. {red}Bot{default} mode {red}can't be enabled{default}!"
+	}
+
+    "PVB_Enable"
+	{
+		"en"        "[{olive}TFDB{default}] {blue}Player{orange} vs. {red}Bot{default} mode {community}enabled{default}!"
+	}
+
+	"PVB_Disable"
+	{
+		"en"        "[{olive}TFDB{default}] {blue}Player{orange} vs. {red}Bot{default} mode {community}disabled{default}!"
+	}
+
+	"PVB_Vote_Cooldown"
+	{
+		"#format"	"{1:.0f}"
+		"en"		"[{olive}TFDB{default}] Voting for {darkred}PVB{default} is in cooldown for {darkorange}{1}{default} seconds."
+	}
+
+	"PVB_Vote_Failed"
+	{
+		"en"		"[{olive}TFDB{default}] {blue}Player{orange} vs. {red}Bot{default} mode vote {red}failed{default}."
+	}
+}
