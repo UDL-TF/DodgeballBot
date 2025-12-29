@@ -21,9 +21,11 @@ int g_iWeapon = -1;
 int g_iDeflectRadius = 750;
 int g_iCriticalDefRadius = 100;
 int g_iBotMoveDistance = 400;
+int g_iCurrentPlayer = -1;
 
 float g_fRandomAngle = 180.0;
 float g_fMinDragTime = 0.0;
+float g_fOrbitDegree = 90.0;
 float g_fGlobalAngle[3];
 float g_fTargetPositions[2][3];
 
@@ -40,6 +42,7 @@ ConVar g_CvarPVBenable;
 ConVar g_CvarVoteCooldown;
 ConVar g_CvarBotTeam;
 ConVar g_CvarBotAutoJoin;
+ConVar g_CvarCleanBotsWhenInactive;
 
 public Plugin myinfo = 
 {
@@ -55,10 +58,11 @@ public void OnPluginStart()
 	RegAdminCmd("sm_pvb", PVB_Cmd, ADMFLAG_GENERIC, "Toggle command for dodgeball bot.");
 	RegConsoleCmd("sm_votepvb", VotePvB_Cmd);
 
-	g_CvarPVBenable = CreateConVar("tfdb_bot_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
-	g_CvarVoteCooldown = CreateConVar("tfdb_bot_vote_cooldown", "120", "Cooldown time for the voting command.", _, true, 0.0);
-	g_CvarBotTeam = CreateConVar("tfdb_bot_team", "2", "The default team for the bot, 2 - Red, 3 - Blu.", _, true, 2.0, true, 3.0);
-	g_CvarBotAutoJoin = CreateConVar("tfdb_bot_autojoin", "1", "Enable/ disable autojoin for bot when a player joins the server.", _, true, 0.0, true, 1.0);
+	g_CvarPVBenable 	= CreateConVar("tf_dodgeball_bot_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
+	g_CvarVoteCooldown 	= CreateConVar("tf_dodgeball_bot_vote_cooldown", "120", "Cooldown time for the voting command.", _, true, 0.0);
+	g_CvarBotTeam 		= CreateConVar("tf_dodgeball_bot_team", "3", "The default team for the bot, 2 - Red, 3 - Blu.", _, true, 2.0, true, 3.0);
+	g_CvarBotAutoJoin 	= CreateConVar("tf_dodgeball_bot_autojoin", "1", "Enable/ disable autojoin for bot when a player joins the server.", _, true, 0.0, true, 1.0);
+	g_CvarCleanBotsWhenInactive = CreateConVar("tf_dodgeball_bot_cleanbots", "1", "Should this plugin kick bots when it's not active?", _, true, 0.0, true, 1.0);
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("object_deflected", OnObjectDeflected);
@@ -70,17 +74,20 @@ public void OnPluginStart()
 
 public void OnConfigsExecuted()
 {
-	ParseConfig();
-}
+	if (TFDB_IsDodgeballEnabled() && g_CvarPVBenable.BoolValue)
+	{
+		ParseConfig();
 
-public void OnMapStart()
-{
-	g_fPVBVoteTime = 0.0;
+		g_fPVBVoteTime = 0.0;
+	}
 }
 
 public void OnMapEnd()
 {
-	if (g_bEnable) DisableMode();
+	if (g_bEnable)
+	{
+		DisableMode();
+	}
 }
 
 public void OnClientDisconnect(int iClient)
@@ -105,7 +112,8 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 	
 	if (!g_bEnable)
 	{
-		DestroyBot();
+		if (g_CvarCleanBotsWhenInactive.BoolValue)
+			CleanBots();
 	}
 	else
 	{
@@ -136,8 +144,11 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 
 	if (iClient != iBot) return;
 
-	//CPrintToChatAll("1. %.4f", GetEngineTime());
-	CreateTimer(FloatAbs(g_fMinDragTime - 0.1), Timer_Flick); // 0.1 is a correction number for the completion of the code
+	CreateTimer(GetOptimalDragTime(g_fMinDragTime), Timer_Flick); // 0.1 is a correction number for the completion of the code
+
+	// reset the deflect radius to prevent other shots to be missed
+	g_iCriticalDefRadius = 100;
+	g_iDeflectRadius = 285;
 }
 
 // ------------------ [Core function] -----------------------------
@@ -149,16 +160,57 @@ public void OnGameFrame()
 	g_bAttack = false;
 
 	int iIndex = -1;
-	while((iIndex = FindNextValidRocket(iIndex)) != -1)
+	while ((iIndex = FindNextValidRocket(iIndex)) != -1) // I used the same method to spin through valid rockets as in the dodgeball plugin
 	{
-		// I used the same method to spin through rockets as in the dodgeball plugin
-		g_fMinDragTime = TFDB_GetRocketClassDragTimeMin(TFDB_GetRocketClass(iIndex));
 		int iRocket = TFDB_GetRocketEntity(iIndex);
+
+		g_fMinDragTime = TFDB_GetRocketClassDragTimeMin(TFDB_GetRocketClass(iIndex));
 
 		GetClientEyePosition(iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
 
-		if (GetVectorDistance(fBotPosition, fRocketPosition) <= g_iBotMoveDistance && GetEntProp(iRocket, Prop_Send, "m_iTeamNum") != g_CvarBotTeam.IntValue)
+		if (!g_bDeflectPause)
+		{
+			float fAngle = 0.0, fPlayerpos[3];
+			fPlayerpos = NULL_VECTOR;
+
+			CreateTimer(0.1, Timer_ResetState); // I don't know why we have to wait 0.1 but ig it works
+
+			if (IsValidClient(g_iCurrentPlayer, false, false))
+			{
+				GetClientAbsOrigin(g_iCurrentPlayer, fPlayerpos);
+
+				if (GetVectorDistance(fBotPosition, fRocketPosition) <= GetVectorDistance(fBotPosition, fPlayerpos) * 0.45)
+				{
+					fAngle = GetAngleToTarget(iBot, iRocket);
+				}
+			}
+
+			RocketState iRocketState = TFDB_GetRocketState(iIndex);
+			
+			if (!g_bBotFixed && !(iRocketState & RocketState_Bouncing) && 35.0 < fAngle < 70.0)
+			{
+				g_iDeflectRadius = 0;
+
+				if (TFDB_GetRocketMphSpeed(iIndex) < 200.0)	// Had to use mph its a much smaller number to work with than hammer
+				{
+					g_iCriticalDefRadius = 40;
+
+					CreateTimer(GetRandomFloat(1.5, 2.5), Timer_ResetDistance);
+
+					if (fAngle < 55.0)
+						AvoidRocket(fBotPosition, fRocketPosition);
+				}
+			}
+			else	
+			{
+				g_iDeflectRadius = GetRandomInt(200, 250);
+			}
+
+			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
+		}
+
+		if (GetVectorDistance(fBotPosition, fRocketPosition) <= g_iBotMoveDistance && GetEntProp(iRocket, Prop_Send, "m_iTeamNum") != GetClientTeam(iBot))
 		{
 			float fAngle[3], fBotRocket[3];
 			MakeAngle(fRocketPosition, fBotPosition, fAngle);
@@ -177,7 +229,7 @@ public void OnGameFrame()
 					g_fGlobalAngle[2] = fAngle[2];
 				}
 			}
-			else
+			else	// Orbit rocket
 			{
 				MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
 
@@ -191,16 +243,16 @@ public void OnGameFrame()
 			float fAngle[3], fTargetPosition[3], fNewPoint[3], fViewingAngleToRocket[3];
 			fTargetPosition = GetTargetPosition(iBot);
 
-			int iPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
+			g_iCurrentPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
 
-			if (!IsValidClient(iPlayer, false, false)) return;
+			if (!IsValidClient(g_iCurrentPlayer, false, false)) return;
 
-			if (g_bBotFixed)
+			if (g_bBotFixed)	// fixed-position
 			{
 				MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
 				NormalizeVector(fNewPoint, fNewPoint);
 
-				GetClientEyePosition(iPlayer, fTargetPosition);
+				GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
 				MakeAngle(fTargetPosition, fBotPosition, fAngle);
 
 				if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0) // We don't wanna move while performing a reflection/orbit
@@ -212,10 +264,10 @@ public void OnGameFrame()
 					TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
 				}
 			}
-			else
+			else	// player-mimic
 			{
 				// Here this might be confusing but the fTargetPosition is used for mimicing the player (position)
-				GetClientEyePosition(iPlayer, fTargetPosition);
+				GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
 				MakeAngle(fTargetPosition, fBotPosition, fAngle);
 
 				NegateVector(fTargetPosition);
@@ -240,26 +292,6 @@ public void OnGameFrame()
 				g_fGlobalAngle[2] = fAngle[2];
 			}
 		}
-
-		if (!g_bDeflectPause)
-		{
-			CreateTimer(0.1, Timer_ResetState); // I don't know why we have to wait 0.1 but ig it works
-
-			if (GetRandomInt(1, 3) == 3 && GetAngleToTarget(iBot, iRocket) > 30.0 && !g_bBotFixed)
-			{
-				g_iDeflectRadius = 0;
-				g_iCriticalDefRadius = 40;
-
-				//CPrintToChatAll("orbit");
-				CreateTimer(GetRandomFloat(1.0, 2.5), Timer_ResetDistance);
-			}
-			else	
-			{
-				g_iDeflectRadius = GetRandomInt(200, 250);
-			}
-
-			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
-		}
 	}
 }
 
@@ -273,13 +305,13 @@ int FindNextValidRocket(const int &iIndex)
 	return -1;
 }
 
-void MakeAngle(const float fPos1[3], const float fPos2[3], float fAngle[3])
+void MakeAngle(const float fPos1[3], const float fPos2[3], float fOutput[3])
 {
 	float fBuffer[3];
 	MakeVectorFromPoints(fPos1, fPos2, fBuffer);
 	NormalizeVector(fBuffer, fBuffer);
-	GetVectorAngles(fBuffer, fAngle);
-	AngleFix(fAngle);
+	GetVectorAngles(fBuffer, fOutput);
+	AngleFix(fOutput);
 }
 
 void AngleFix(float fAngle[3])
@@ -293,6 +325,28 @@ void AngleFix(float fAngle[3])
 		fAngle[0] += 360.0;
 
 	fAngle[1] += 180.0;
+}
+
+void AvoidRocket(const float fBotPos[3], const float fRocketPos[3])
+{
+	float fBotRocket[3];
+	MakeVectorFromPoints(fRocketPos, fBotPos, fBotRocket);
+
+	if (fBotRocket[0] < 0 || fBotRocket[1] < 0)
+	{
+		g_fOrbitDegree *= -1.0;
+	}
+
+	float x = fBotRocket[0], y = fBotRocket[1]; fBotRocket[2] = 0.0;
+	fBotRocket[0] = x * Cosine(DegToRad(g_fOrbitDegree)) - y * Sine(DegToRad(g_fOrbitDegree));
+	fBotRocket[1] = x * Sine(DegToRad(g_fOrbitDegree)) + y * Cosine(DegToRad(g_fOrbitDegree));
+
+	ScaleVector(fBotRocket, -15000.0); // Ik it's a big ass scale
+
+	for	(int i = 0; i <= 4; i++)
+	{
+		TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+	}
 }
 
 public Action Timer_ResetState(Handle hTimer)
@@ -321,16 +375,16 @@ public Action Timer_Flick(Handle hTimer)
 	}
 	else
 	{
-		switch (GetRandomInt(1, 10)) //here the switch stayed for convenience
+		switch (GetRandomInt(7, 10)) //here the switch stayed for convenience
 		{
-			case 1, 2, 3:
+			/*case 1, 2, 3:
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(-10.0, 10.0);
 			}
 			case 4, 5, 6:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(-15.0, 15.0);
-			}
+			}*/
 			case 7, 8:
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(-90.0, 90.0);
@@ -342,7 +396,7 @@ public Action Timer_Flick(Handle hTimer)
 		}
 	}
 
-	if (g_fGlobalAngle[0] <= -90.0)
+	if (g_fGlobalAngle[0] <= -90.0)		// Other type of angle fix for the two axis
 	{
 		g_fGlobalAngle[0] = -89.0;
 	}
@@ -361,7 +415,6 @@ public Action Timer_Flick(Handle hTimer)
 	}
 
 	TeleportEntity(iBot, NULL_VECTOR, g_fGlobalAngle, NULL_VECTOR);
-	//CPrintToChatAll("2. %.4f", GetEngineTime());
 
 	return Plugin_Stop;
 }
@@ -381,17 +434,20 @@ public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fV
 // ---------------- [Enable / Disable] ---------------------
 void EnableMode()
 {
-	DestroyBot();
-	ServerCommand("sm_cvar tf_bot_quota_mode normal");
+	CleanBots();	// Kicking any other bot that might be present
+
+	ServerCommand("sm_cvar tf_bot_quota_mode normal"); // Setting up the server for the mode
 	ServerCommand("sm_cvar tf_bot_quota 0");
+	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 0");
 	ServerCommand("mp_autoteambalance 0");
-	ServerCommand("tf_bot_add 1 Pyro red easy \"%s\"", g_strBotName);
+
+	ServerCommand("tf_bot_add 1 Pyro %s easy \"%s\"", g_CvarBotTeam.IntValue == 2 ? "red" : "blue", g_strBotName);	// Creating the bot
 	ServerCommand("tf_bot_difficulty 0");
 	ServerCommand("tf_bot_keep_class_after_death 1");
 	ServerCommand("tf_bot_taunt_victim_chance 0");
 	ServerCommand("tf_bot_join_after_player 0");
 
-	ChangeClientsTeam();
+	ChangeClientsTeam();	// Changing already joined players teams
 	
 	g_bEnable = true;
 
@@ -400,12 +456,16 @@ void EnableMode()
 
 void DisableMode()
 {
+	// Restore everything to its default value
+	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 250");
+
 	iBot = -1;
 	g_iWeapon = -1;
+	g_iCurrentPlayer = -1;
 	g_bEnable = false;
 	g_bBotFixed = false;
 
-	DestroyBot();
+	CleanBots();	// Kick all bots
 
 	CPrintToChatAll("%t", "PVB_Disable");
 }
@@ -415,6 +475,8 @@ public Action PVB_Cmd(int iClient, int iArgs)
 {
 	if (!g_CvarPVBenable.BoolValue || !TFDB_IsDodgeballEnabled())
 	{
+		CPrintToChat(iClient, "%t", "PVB_Mode_Disabled");
+
 		return Plugin_Handled;
 	}
 
@@ -430,6 +492,8 @@ public Action VotePvB_Cmd(int iClient, int iArgs)
 {
 	if (!g_CvarPVBenable.BoolValue || !TFDB_IsDodgeballEnabled())
 	{
+		CPrintToChat(iClient, "%t", "PVB_Mode_Disabled");
+
 		return Plugin_Handled;
 	}
 
@@ -442,7 +506,7 @@ public Action VotePvB_Cmd(int iClient, int iArgs)
 
 	if (IsVoteInProgress())
 	{
-		CPrintToChat(iClient, "%t", "Dodgeball_Vote_Conflict");
+		CPrintToChat(iClient, "%t", "Dodgeball_FFAVote_Conflict");
 		
 		return Plugin_Handled;
 	}
@@ -459,7 +523,7 @@ public Action VotePvB_Cmd(int iClient, int iArgs)
 
 	for (int i = 1; i <= MaxClients; i++) 
 	{
-		if(!IsValidClient(i)) continue;
+		if (!IsValidClient(i)) continue;
 
 		iClients[iTotal++] = i;
 	}
@@ -500,20 +564,16 @@ public void VotePVBResultCallBack(Menu hMenu, int iNumVotes, int iNumClients, co
 	}
 	else
 	{
-		CPrintToChatAll("%t", "Dodgeball_PVBVote_Failed");
+		CPrintToChatAll("%t", "PVB_Vote_Failed");
 	}
 }
 
 void ParseConfig()
 {
-	if (!TFDB_IsDodgeballEnabled() && !g_CvarPVBenable.BoolValue) return;
-
 	ResetTargetPositions();
 
 	char strPath[PLATFORM_MAX_PATH];
 	BuildPath(Path_SM, strPath, sizeof(strPath), "configs/dodgeball/dodgeball_bot.cfg");
-
-	if (!FileExists(strPath, true)) return;
 
 	KeyValues kv = new KeyValues("DodgeballBot");
 
@@ -552,7 +612,6 @@ void ParseMaps(KeyValues kv)
 {
 	char sMapName[128];
 	GetCurrentMap(sMapName, sizeof(sMapName));
-	// PrintToChatAll(sMapName);
 
 	kv.GotoFirstSubKey();
 	do
@@ -565,34 +624,27 @@ void ParseMaps(KeyValues kv)
 
 		if (kv.JumpToKey("red"))
 		{
-			char sSectionName[128];
-			kv.GetSectionName(sSectionName, sizeof(sSectionName));
-			// PrintToChatAll(sSectionName);
 			g_fTargetPositions[0][0] = kv.GetFloat("Coord_X");
 			g_fTargetPositions[0][1] = kv.GetFloat("Coord_Y");
 			g_fTargetPositions[0][2] = kv.GetFloat("Coord_Z");
-			// PrintToChatAll("Target 1: %f %f %f", g_fTargetPositions[0][0], g_fTargetPositions[0][1], g_fTargetPositions[0][2]);
+
 			kv.GoBack();
 		}
+
 		if (kv.JumpToKey("blue"))
 		{
-			char sSectionName[128];
-			kv.GetSectionName(sSectionName, sizeof(sSectionName));
-			// PrintToChatAll(sSectionName);
 			g_fTargetPositions[1][0] = kv.GetFloat("Coord_X");
 			g_fTargetPositions[1][1] = kv.GetFloat("Coord_Y");
 			g_fTargetPositions[1][2] = kv.GetFloat("Coord_Z");
-			// PrintToChatAll("Target 2: %f %f %f", g_fTargetPositions[1][0], g_fTargetPositions[1][1], g_fTargetPositions[1][2]);
 		}
 	}
 	while (kv.GotoNextKey(false));
-
-	kv.GoBack();
 }
 
 float[] GetTargetPosition(int iClient)
 {
 	int iTeam = GetClientTeam(iClient);
+
 	if (iTeam == view_as<int>(TFTeam_Red))
 	{
 		return g_fTargetPositions[0];
@@ -606,19 +658,20 @@ float[] GetTargetPosition(int iClient)
 void GetViewAnglesToTarget(int iClient, const float fTargetPosition[3], float fAngleOutput[3])
 { 
 	float fClientEyes[3], fPositionalVector[3];
+
 	GetClientEyePosition(iClient, fClientEyes);
 	MakeVectorFromPoints(fTargetPosition, fClientEyes, fPositionalVector);
 	GetVectorAngles(fPositionalVector, fAngleOutput);
 
 	if (fAngleOutput[0] >= 270)
 	{ 
-		fAngleOutput[0] -= 270; 
+		fAngleOutput[0] -= 270;
 		fAngleOutput[0] -= 90;
 	}
 	else if (fAngleOutput[0] <= 90)
 	{ 
-		fAngleOutput[0] *= -1; 
-	} 
+		fAngleOutput[0] *= -1;
+	}
 
 	fAngleOutput[1] -= 180;
 }
@@ -659,7 +712,7 @@ int GetRealClientCount()
 	int iCount = 0;
 
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
-	{	
+	{
 		if (IsValidClient(iClient)) iCount++;
 	}
 
@@ -688,7 +741,14 @@ void ChangeClientsTeam()
 	}
 }
 
-void DestroyBot()
-{	
+void CleanBots()
+{
 	ServerCommand("tf_bot_kick all");
+}
+
+float GetOptimalDragTime(const float fDragTime)
+{
+	if (fDragTime > 0.05) return FloatAbs(fDragTime - 0.1);
+
+	return fDragTime;
 }
