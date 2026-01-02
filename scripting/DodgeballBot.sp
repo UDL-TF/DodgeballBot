@@ -9,10 +9,10 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "2.1.0"
+#define PLUGIN_VERSION     "1.0.0"
 #define PLUGIN_URL         "-"
 
-#define AnalogueTeam(%1) (%1^1)
+#define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
 
 bool g_bEnable = false;
 
@@ -24,7 +24,6 @@ int g_iBotMoveDistance = 400;
 int g_iCurrentPlayer = -1;
 
 float g_fRandomAngle = 180.0;
-float g_fMinDragTime = 0.0;
 float g_fOrbitDegree = 90.0;
 float g_fGlobalAngle[3];
 float g_fTargetPositions[2][3];
@@ -144,7 +143,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 
 	if (iClient != iBot) return;
 
-	CreateTimer(GetOptimalDragTime(g_fMinDragTime), Timer_Flick); // 0.1 is a correction number for the completion of the code
+	CreateTimer(0.01, Timer_Flick);
 
 	// reset the deflect radius to prevent other shots to be missed
 	g_iCriticalDefRadius = 100;
@@ -164,8 +163,6 @@ public void OnGameFrame()
 	{
 		int iRocket = TFDB_GetRocketEntity(iIndex);
 
-		g_fMinDragTime = TFDB_GetRocketClassDragTimeMin(TFDB_GetRocketClass(iIndex));
-
 		GetClientEyePosition(iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
 
@@ -176,15 +173,14 @@ public void OnGameFrame()
 
 			CreateTimer(0.1, Timer_ResetState); // I don't know why we have to wait 0.1 but ig it works
 
-			if (IsValidClient(g_iCurrentPlayer, false, false))
-			{
-				GetClientAbsOrigin(g_iCurrentPlayer, fPlayerpos);
+			GetClientAbsOrigin(g_iCurrentPlayer, fPlayerpos);
 
-				if (GetVectorDistance(fBotPosition, fRocketPosition) <= GetVectorDistance(fBotPosition, fPlayerpos) * 0.45)
-				{
-					fAngle = GetAngleToTarget(iBot, iRocket);
-				}
+			if (GetVectorDistance(fBotPosition, fRocketPosition) <= GetVectorDistance(fBotPosition, fPlayerpos) * 0.45)
+			{
+				fAngle = GetAngleToTarget(iBot, iRocket);
 			}
+
+			//CPrintToChatAll("bot to rocket angle: %.4f", fAngle);
 
 			RocketState iRocketState = TFDB_GetRocketState(iIndex);
 			
@@ -197,15 +193,15 @@ public void OnGameFrame()
 					g_iCriticalDefRadius = 40;
 
 					CreateTimer(GetRandomFloat(1.5, 2.5), Timer_ResetDistance);
-
-					if (fAngle < 55.0)
-						AvoidRocket(fBotPosition, fRocketPosition);
 				}
 			}
 			else	
 			{
 				g_iDeflectRadius = GetRandomInt(200, 250);
 			}
+
+			if (!g_bBotFixed && fAngle < 55.0)
+				AvoidRocket(fBotPosition, fRocketPosition);
 
 			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
 		}
@@ -243,9 +239,9 @@ public void OnGameFrame()
 			float fAngle[3], fTargetPosition[3], fNewPoint[3], fViewingAngleToRocket[3];
 			fTargetPosition = GetTargetPosition(iBot);
 
-			g_iCurrentPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
-
-			if (!IsValidClient(g_iCurrentPlayer, false, false)) return;
+			int iPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
+			if (IsValidClient(iPlayer, false, false))
+				g_iCurrentPlayer = iPlayer;
 
 			if (g_bBotFixed)	// fixed-position
 			{
@@ -375,17 +371,13 @@ public Action Timer_Flick(Handle hTimer)
 	}
 	else
 	{
-		switch (GetRandomInt(7, 10)) //here the switch stayed for convenience
+		switch (GetRandomInt(5, 10)) //here the switch stayed for convenience
 		{
-			/*case 1, 2, 3:
+			case 5:
 			{
-				g_fGlobalAngle[0] += GetRandomFloat(-10.0, 10.0);
+				g_fGlobalAngle[1] += GetRandomFloat(-20.0, 20.0);
 			}
-			case 4, 5, 6:
-			{
-				g_fGlobalAngle[1] += GetRandomFloat(-15.0, 15.0);
-			}*/
-			case 7, 8:
+			case 6, 7, 8:
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(-90.0, 90.0);
 			}
@@ -744,11 +736,4 @@ void ChangeClientsTeam()
 void CleanBots()
 {
 	ServerCommand("tf_bot_kick all");
-}
-
-float GetOptimalDragTime(const float fDragTime)
-{
-	if (fDragTime > 0.05) return FloatAbs(fDragTime - 0.1);
-
-	return fDragTime;
 }
