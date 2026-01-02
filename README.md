@@ -24,6 +24,10 @@
 - [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) is a mandatory requirement not just for compiling also for functioning.
 
 # Installation
+Download the stable release for the best results. Then unzip the file.
+
+Add everything to its respective folder.
+
 Copy the extra phrases from `extra_translations.txt` into the `tfdb.phrases.txt` file.
 
 # Commands
@@ -38,9 +42,7 @@ In the config file I'll try to include predefined coordinates for most maps to f
 When you are alone on the server you are able to vote to enable the bot without the cooldown.
 
 # Issues
-It's not comletetly unbeatable, there are (very) few instances where it tries to orbit a rocket that is not actually orbitable. But it's currently getting worked on!
-
-Can't play against multiple players, sadly tf2's built in AI overwrites the angle where the bot is looking and causing it to miss rockets.
+It's not comletetly unbeatable, there are VERY few instances where it tries to orbit a rocket that is not actually orbitable. But it's currently getting worked on!
 
 # Credits
 - Bot core functions (movement and flick) is based on Elite's work.
