@@ -581,7 +581,7 @@ void ParseConfig()
 	ResetTargetPositions();
 
 	char strPath[PLATFORM_MAX_PATH];
-	BuildPath(Path_SM, strPath, sizeof(strPath), "configs/dodgeball/dodgeball_bot.cfg");
+	BuildPath(Path_SM, strPath, sizeof(strPath), "configs/dodgeball_bot.cfg");
 
 	KeyValues kv = new KeyValues("DodgeballBot");
 
