@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.0"
+#define PLUGIN_VERSION     "1.0.1"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -32,6 +32,7 @@ bool g_bChoiceAngle 	= false;
 bool g_bAttack 			= false;
 bool g_bDeflectPause 	= true;
 bool g_bBotFixed		= false;
+bool g_bOrbit			= false;
 
 float g_fPVBVoteTime = 0.0;
 
@@ -91,15 +92,22 @@ public void OnMapEnd()
 
 public void OnClientDisconnect(int iClient)
 {
-	if ((iClient == iBot || GetRealClientCount() == 0) && g_bEnable)
+	if (g_bEnable)
 	{
-		DisableMode();
+		if (iClient == iBot || GetRealClientCount() == 0)
+		{
+			DisableMode();
+		}
+		else if (iClient == g_iCurrentPlayer)	//This is to ensure that the bot doesn't try to mimic a disconnected player
+		{
+			g_iCurrentPlayer = -1;
+		}
 	}
 }
 
 public void OnClientPutInServer(int iClient)
 {
-	if (g_CvarBotAutoJoin.BoolValue && GetRealClientCount() == 1 && !g_bEnable)
+	if (g_CvarBotAutoJoin.BoolValue && !g_bEnable && GetRealClientCount() == 1)
 	{
 		EnableMode();
 	}
@@ -148,6 +156,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 	// reset the deflect radius to prevent other shots to be missed
 	g_iCriticalDefRadius = 100;
 	g_iDeflectRadius = 285;
+	g_bOrbit = false;
 }
 
 // ------------------ [Core function] -----------------------------
@@ -173,20 +182,24 @@ public void OnGameFrame()
 
 			CreateTimer(0.1, Timer_ResetState); // I don't know why we have to wait 0.1 but ig it works
 
-			GetClientAbsOrigin(g_iCurrentPlayer, fPlayerpos);
-
-			if (GetVectorDistance(fBotPosition, fRocketPosition) <= GetVectorDistance(fBotPosition, fPlayerpos) * 0.45)
+			if (g_iCurrentPlayer != -1)
 			{
-				fAngle = GetAngleToTarget(iBot, iRocket);
+				GetClientAbsOrigin(g_iCurrentPlayer, fPlayerpos);
+
+				if (GetVectorDistance(fBotPosition, fRocketPosition) <= GetVectorDistance(fBotPosition, fPlayerpos) * 0.45)
+				{
+					fAngle = GetAngleToTarget(iBot, iRocket);
+				}
 			}
 
 			//CPrintToChatAll("bot to rocket angle: %.4f", fAngle);
 
 			RocketState iRocketState = TFDB_GetRocketState(iIndex);
 			
-			if (!g_bBotFixed && !(iRocketState & RocketState_Bouncing) && 35.0 < fAngle < 70.0)
+			if (!g_bBotFixed && !(iRocketState & RocketState_Bouncing || iRocketState & RocketState_Dragging) && 35.0 < fAngle < 70.0)
 			{
 				g_iDeflectRadius = 0;
+				g_bOrbit = true;
 
 				if (TFDB_GetRocketMphSpeed(iIndex) < 200.0)	// Had to use mph its a much smaller number to work with than hammer
 				{
@@ -243,40 +256,43 @@ public void OnGameFrame()
 			if (IsValidClient(iPlayer, false, false))
 				g_iCurrentPlayer = iPlayer;
 
-			if (g_bBotFixed)	// fixed-position
+			if (g_iCurrentPlayer != -1 && !g_bOrbit)
 			{
-				MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
-				NormalizeVector(fNewPoint, fNewPoint);
-
-				GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
-				MakeAngle(fTargetPosition, fBotPosition, fAngle);
-
-				if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0) // We don't wanna move while performing a reflection/orbit
+				if (g_bBotFixed)	// fixed-position
 				{
-					GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
+					MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
+					NormalizeVector(fNewPoint, fNewPoint);
 
-					fNewPoint[2] = 0.0;
-					ScaleVector(fNewPoint, -1000.0);
-					TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
+					GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
+					MakeAngle(fTargetPosition, fBotPosition, fAngle);
+
+					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0) // We don't wanna move while performing a reflection/orbit
+					{
+						GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
+
+						fNewPoint[2] = 0.0;
+						ScaleVector(fNewPoint, -1000.0);
+						TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
+					}
 				}
-			}
-			else	// player-mimic
-			{
-				// Here this might be confusing but the fTargetPosition is used for mimicing the player (position)
-				GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
-				MakeAngle(fTargetPosition, fBotPosition, fAngle);
-
-				NegateVector(fTargetPosition);
-				MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
-				NormalizeVector(fNewPoint, fNewPoint);
-
-				if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0)
+				else	// player-mimic
 				{
-					GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
+					// Here this might be confusing but the fTargetPosition is used for mimicing the player (position)
+					GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
+					MakeAngle(fTargetPosition, fBotPosition, fAngle);
 
-					fNewPoint[2] = 0.0;
-					ScaleVector(fNewPoint, -1000.0);
-					TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
+					NegateVector(fTargetPosition);
+					MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
+					NormalizeVector(fNewPoint, fNewPoint);
+
+					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0)
+					{
+						GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
+
+						fNewPoint[2] = 0.0;
+						ScaleVector(fNewPoint, -1000.0);
+						TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
+					}
 				}
 			}
 
