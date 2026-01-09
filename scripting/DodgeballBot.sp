@@ -252,6 +252,10 @@ public void OnGameFrame()
 			float fAngle[3], fTargetPosition[3], fNewPoint[3], fViewingAngleToRocket[3];
 			fTargetPosition = GetTargetPosition(iBot);
 
+			GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
+
+			TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
+
 			int iPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
 			if (IsValidClient(iPlayer, false, false))
 				g_iCurrentPlayer = iPlayer;
@@ -268,11 +272,9 @@ public void OnGameFrame()
 
 					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0) // We don't wanna move while performing a reflection/orbit
 					{
-						GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
-
 						fNewPoint[2] = 0.0;
 						ScaleVector(fNewPoint, -1000.0);
-						TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
+						TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
 					}
 				}
 				else	// player-mimic
@@ -287,11 +289,9 @@ public void OnGameFrame()
 
 					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0)
 					{
-						GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
-
 						fNewPoint[2] = 0.0;
 						ScaleVector(fNewPoint, -1000.0);
-						TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, fNewPoint);
+						TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
 					}
 				}
 			}
