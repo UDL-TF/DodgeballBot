@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.1"
+#define PLUGIN_VERSION     "1.0.2"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -94,7 +94,7 @@ public void OnClientDisconnect(int iClient)
 {
 	if (g_bEnable)
 	{
-		if (iClient == iBot || GetRealClientCount() == 0)
+		if (iClient == iBot || GetRealClientCount(false) == 0)
 		{
 			DisableMode();
 		}
@@ -105,9 +105,9 @@ public void OnClientDisconnect(int iClient)
 	}
 }
 
-public void OnClientPutInServer(int iClient)
+public void OnClientConnected(int iClient)
 {
-	if (g_CvarBotAutoJoin.BoolValue && !g_bEnable && GetRealClientCount() == 1)
+	if (g_CvarBotAutoJoin.BoolValue && !g_bEnable && GetRealClientCount(false) == 1)
 	{
 		EnableMode();
 	}
@@ -505,7 +505,7 @@ public Action VotePvB_Cmd(int iClient, int iArgs)
 		return Plugin_Handled;
 	}
 
-	if (!g_fPVBVoteTime && g_fPVBVoteTime + g_CvarVoteCooldown.FloatValue > GetGameTime() && GetRealClientCount() > 1)
+	if (g_fPVBVoteTime != 0.0 && g_fPVBVoteTime + g_CvarVoteCooldown.FloatValue > GetGameTime() && GetRealClientCount() > 1)
 	{
 		CPrintToChat(iClient, "%t", "PVB_Vote_Cooldown", g_fPVBVoteTime + g_CvarVoteCooldown.FloatValue - GetGameTime());
 
@@ -715,13 +715,14 @@ float GetAngleToTarget(int &iClient, int &iTarget)
 	return fResultAngle;
 }
 
-int GetRealClientCount()
+int GetRealClientCount(bool bInGameOnly = true)
 {
 	int iCount = 0;
 
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
 	{
-		if (IsValidClient(iClient)) iCount++;
+		if (((bInGameOnly) ? IsClientInGame(iClient) : IsClientConnected(iClient)) && !IsFakeClient(iClient) && !IsClientReplay(iClient) && !IsClientSourceTV(iClient))
+			iCount++;
 	}
 
 	return iCount;
