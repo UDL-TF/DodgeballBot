@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.2"
+#define PLUGIN_VERSION     "1.0.3"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -143,6 +143,18 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 	return Plugin_Continue;
 }
 
+public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVelocity[3], float fAngles[3], int &iWeapon)
+{
+	if (g_bAttack && iClient == iBot && g_iWeapon != -1)
+	{
+		SetEntPropFloat(g_iWeapon, Prop_Send, "m_flNextSecondaryAttack", 0.0);
+
+		iButtons |= IN_ATTACK2;
+	}
+
+	return Plugin_Continue;
+}
+
 public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroadcast)
 {
 	if (!g_bEnable) return;
@@ -151,7 +163,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 
 	if (iClient != iBot) return;
 
-	CreateTimer(0.01, Timer_Flick);
+	Flick();
 
 	// reset the deflect radius to prevent other shots to be missed
 	g_iCriticalDefRadius = 100;
@@ -339,45 +351,7 @@ void AngleFix(float fAngle[3])
 	fAngle[1] += 180.0;
 }
 
-void AvoidRocket(const float fBotPos[3], const float fRocketPos[3])
-{
-	float fBotRocket[3];
-	MakeVectorFromPoints(fRocketPos, fBotPos, fBotRocket);
-
-	if (fBotRocket[0] < 0 || fBotRocket[1] < 0)
-	{
-		g_fOrbitDegree *= -1.0;
-	}
-
-	float x = fBotRocket[0], y = fBotRocket[1]; fBotRocket[2] = 0.0;
-	fBotRocket[0] = x * Cosine(DegToRad(g_fOrbitDegree)) - y * Sine(DegToRad(g_fOrbitDegree));
-	fBotRocket[1] = x * Sine(DegToRad(g_fOrbitDegree)) + y * Cosine(DegToRad(g_fOrbitDegree));
-
-	ScaleVector(fBotRocket, -15000.0); // Ik it's a big ass scale
-
-	for	(int i = 0; i <= 4; i++)
-	{
-		TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
-	}
-}
-
-public Action Timer_ResetState(Handle hTimer)
-{
-	g_bDeflectPause = true;
-	g_bChoiceAngle = false;
-
-	return Plugin_Stop;
-}
-
-public Action Timer_ResetDistance(Handle hTimer)
-{
-	g_iDeflectRadius = 285;
-	g_iCriticalDefRadius = 100;
-
-	return Plugin_Stop;
-}
-
-public Action Timer_Flick(Handle hTimer)
+void Flick()
 {
 	// So it seems like after doing some statistics "if" statements were more consistent in completion time ranging from ~0.087-0.107 in average it was ~0.1047
 	// compared to "switch" which had a bigger deviation ranging ~0.078-0.116 in average it was ~0.1167 because of the more consistent time this configuration is used, this part of the code should not be touched.
@@ -423,20 +397,44 @@ public Action Timer_Flick(Handle hTimer)
 	}
 
 	TeleportEntity(iBot, NULL_VECTOR, g_fGlobalAngle, NULL_VECTOR);
+}
+
+void AvoidRocket(const float fBotPos[3], const float fRocketPos[3])
+{
+	float fBotRocket[3];
+	MakeVectorFromPoints(fRocketPos, fBotPos, fBotRocket);
+
+	if (fBotRocket[0] < 0 || fBotRocket[1] < 0)
+	{
+		g_fOrbitDegree *= -1.0;
+	}
+
+	float x = fBotRocket[0], y = fBotRocket[1]; fBotRocket[2] = 0.0;
+	fBotRocket[0] = x * Cosine(DegToRad(g_fOrbitDegree)) - y * Sine(DegToRad(g_fOrbitDegree));
+	fBotRocket[1] = x * Sine(DegToRad(g_fOrbitDegree)) + y * Cosine(DegToRad(g_fOrbitDegree));
+
+	ScaleVector(fBotRocket, -15000.0); // Ik it's a big ass scale
+
+	for	(int i = 0; i <= 4; i++)
+	{
+		TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+	}
+}
+
+public Action Timer_ResetState(Handle hTimer)
+{
+	g_bDeflectPause = true;
+	g_bChoiceAngle = false;
 
 	return Plugin_Stop;
 }
 
-public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVelocity[3], float fAngles[3], int &iWeapon)
+public Action Timer_ResetDistance(Handle hTimer)
 {
-	if (g_bAttack && iClient == iBot && g_iWeapon != -1)
-	{
-		SetEntPropFloat(g_iWeapon, Prop_Send, "m_flNextSecondaryAttack", 0.0);
+	g_iDeflectRadius = 285;
+	g_iCriticalDefRadius = 100;
 
-		iButtons |= IN_ATTACK2;
-	}
-
-	return Plugin_Continue;
+	return Plugin_Stop;
 }
 
 // ---------------- [Enable / Disable] ---------------------
@@ -576,6 +574,7 @@ public void VotePVBResultCallBack(Menu hMenu, int iNumVotes, int iNumClients, co
 	}
 }
 
+// ------------- [Parse Config] --------------------
 void ParseConfig()
 {
 	ResetTargetPositions();
@@ -649,6 +648,7 @@ void ParseMaps(KeyValues kv)
 	while (kv.GotoNextKey(false));
 }
 
+// ------------- [Stocks] --------------------
 float[] GetTargetPosition(int iClient)
 {
 	int iTeam = GetClientTeam(iClient);
