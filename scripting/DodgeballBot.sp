@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.3"
+#define PLUGIN_VERSION     "1.0.4"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -24,7 +24,6 @@ int g_iBotMoveDistance = 400;
 int g_iCurrentPlayer = -1;
 
 float g_fRandomAngle = 180.0;
-float g_fOrbitDegree = 90.0;
 float g_fGlobalAngle[3];
 float g_fTargetPositions[2][3];
 
@@ -37,6 +36,19 @@ bool g_bOrbit			= false;
 float g_fPVBVoteTime = 0.0;
 
 char g_strBotName[MAX_NAME_LENGTH];
+int 	g_iDeflectRadiusMin;
+int 	g_iDeflectRadiusMax;
+float 	g_fDragXMin;
+float 	g_fDragXMax;
+float   g_fDragYMin;
+float   g_fDragYMax;
+float   g_fOrbitTimeMin;
+float   g_fOrbitTimeMax;
+float   g_fOrbitAngleMin;
+float   g_fOrbitAngleMax;
+float 	g_fOrbitDegree;
+float	g_fAvoidRocketAngle;
+float   g_fOrbitMaxRocketSpeed;
 
 ConVar g_CvarPVBenable;
 ConVar g_CvarVoteCooldown;
@@ -56,6 +68,7 @@ public Plugin myinfo =
 public void OnPluginStart()
 {	
 	RegAdminCmd("sm_pvb", PVB_Cmd, ADMFLAG_GENERIC, "Toggle command for dodgeball bot.");
+	RegAdminCmd("sm_pvb_reloadcfg", PVB_ReloadCfg, ADMFLAG_CONVARS, "Reloads the bot config.");
 	RegConsoleCmd("sm_votepvb", VotePvB_Cmd);
 
 	g_CvarPVBenable 	= CreateConVar("tf_dodgeball_bot_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
@@ -208,24 +221,24 @@ public void OnGameFrame()
 
 			RocketState iRocketState = TFDB_GetRocketState(iIndex);
 			
-			if (!g_bBotFixed && !(iRocketState & RocketState_Bouncing || iRocketState & RocketState_Dragging) && 35.0 < fAngle < 70.0)
+			if (!g_bBotFixed && !(iRocketState & RocketState_Bouncing || iRocketState & RocketState_Dragging) && g_fOrbitAngleMin < fAngle < g_fOrbitAngleMax)
 			{
 				g_iDeflectRadius = 0;
 				g_bOrbit = true;
 
-				if (TFDB_GetRocketMphSpeed(iIndex) < 200.0)	// Had to use mph its a much smaller number to work with than hammer
+				if (TFDB_GetRocketMphSpeed(iIndex) < g_fOrbitMaxRocketSpeed)	// Had to use mph its a much smaller number to work with than hammer
 				{
 					g_iCriticalDefRadius = 40;
 
-					CreateTimer(GetRandomFloat(1.5, 2.5), Timer_ResetDistance);
+					CreateTimer(GetRandomFloat(g_fOrbitTimeMin, g_fOrbitTimeMax), Timer_ResetDistance);
 				}
 			}
 			else	
 			{
-				g_iDeflectRadius = GetRandomInt(200, 250);
+				g_iDeflectRadius = GetRandomInt(g_iDeflectRadiusMin, g_iDeflectRadiusMax);
 			}
 
-			if (!g_bBotFixed && fAngle < 55.0)
+			if (!g_bBotFixed && fAngle < g_fAvoidRocketAngle)
 				AvoidRocket(fBotPosition, fRocketPosition);
 
 			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
@@ -302,7 +315,7 @@ public void OnGameFrame()
 					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0)
 					{
 						fNewPoint[2] = 0.0;
-						ScaleVector(fNewPoint, -1000.0);
+						ScaleVector(fNewPoint, -1500.0);
 						TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
 					}
 				}
@@ -369,11 +382,11 @@ void Flick()
 			}
 			case 6, 7, 8:
 			{
-				g_fGlobalAngle[0] += GetRandomFloat(-90.0, 90.0);
+				g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
 			}
 			case 9, 10:
 			{
-				g_fGlobalAngle[1] += GetRandomFloat(-90.0, 90.0);
+				g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
 			}
 		}
 	}
@@ -477,6 +490,22 @@ void DisableMode()
 }
 
 // ------------------------- [Commands] ------------------------------
+public Action PVB_ReloadCfg(int iClient, int iArgs)
+{
+	if (!g_CvarPVBenable.BoolValue || !TFDB_IsDodgeballEnabled())
+	{
+		CPrintToChat(iClient, "%t", "PVB_Mode_Disabled");
+
+		return Plugin_Handled;
+	}
+
+	ParseConfig();
+
+	CReplyToCommand(iClient, "Bot config has been reloaded!");
+
+	return Plugin_Handled;
+}
+
 public Action PVB_Cmd(int iClient, int iArgs) 
 {
 	if (!g_CvarPVBenable.BoolValue || !TFDB_IsDodgeballEnabled())
@@ -613,6 +642,27 @@ void ParseConfig()
 void ParseGeneral(KeyValues kv)
 {
 	kv.GetString("name", g_strBotName, sizeof(g_strBotName));
+
+	g_iDeflectRadiusMin = kv.GetNum("deflect radius min");
+	g_iDeflectRadiusMax = kv.GetNum("deflect radius max");
+
+	g_fDragXMin	= kv.GetFloat("x-axis drag min");
+	g_fDragXMax	= kv.GetFloat("x-axis drag max");
+
+	g_fDragYMin = kv.GetFloat("y-axis drag min");
+	g_fDragYMax = kv.GetFloat("y-axis drag max");
+
+	g_fOrbitTimeMin = kv.GetFloat("orbit time min");
+	g_fOrbitTimeMax = kv.GetFloat("orbit time max");
+
+	g_fOrbitAngleMin = kv.GetFloat("orbit angle min");
+	g_fOrbitAngleMax = kv.GetFloat("orbit angle max");
+
+	g_fOrbitDegree = kv.GetFloat("orbit angle");
+
+	g_fAvoidRocketAngle = kv.GetFloat("avoid rocket angle");
+
+	g_fOrbitMaxRocketSpeed = kv.GetFloat("orbit max speed");
 }
 
 void ParseMaps(KeyValues kv)
