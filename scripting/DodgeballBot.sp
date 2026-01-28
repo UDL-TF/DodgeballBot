@@ -238,7 +238,7 @@ public void OnGameFrame()
 				g_iDeflectRadius = GetRandomInt(g_iDeflectRadiusMin, g_iDeflectRadiusMax);
 			}
 
-			if (!g_bBotFixed && fAngle < g_fAvoidRocketAngle)
+			if (!g_bBotFixed && g_bOrbit && fAngle < g_fAvoidRocketAngle)
 				AvoidRocket(fBotPosition, fRocketPosition);
 
 			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
