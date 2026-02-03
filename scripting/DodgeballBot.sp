@@ -9,14 +9,14 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.4"
+#define PLUGIN_VERSION     "1.0.5"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
 
 bool g_bEnable = false;
 
-int iBot = -1;
+int g_iBot = -1;
 int g_iWeapon = -1;
 int g_iDeflectRadius = 750;
 int g_iCriticalDefRadius = 100;
@@ -26,6 +26,7 @@ int g_iCurrentPlayer = -1;
 float g_fRandomAngle = 180.0;
 float g_fGlobalAngle[3];
 float g_fTargetPositions[2][3];
+float g_fRandomPosition[3];
 
 bool g_bChoiceAngle 	= false;
 bool g_bAttack 			= false;
@@ -66,7 +67,7 @@ public Plugin myinfo =
 };
 
 public void OnPluginStart()
-{	
+{
 	RegAdminCmd("sm_pvb", PVB_Cmd, ADMFLAG_GENERIC, "Toggle command for dodgeball bot.");
 	RegAdminCmd("sm_pvb_reloadcfg", PVB_ReloadCfg, ADMFLAG_CONVARS, "Reloads the bot config.");
 	RegConsoleCmd("sm_votepvb", VotePvB_Cmd);
@@ -107,7 +108,7 @@ public void OnClientDisconnect(int iClient)
 {
 	if (g_bEnable)
 	{
-		if (iClient == iBot || GetRealClientCount(false) == 0)
+		if (iClient == g_iBot || GetRealClientCount(false) == 0)
 		{
 			DisableMode();
 		}
@@ -144,11 +145,11 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 		}
 		else
 		{
-			iBot = iClient;
+			g_iBot = iClient;
 
 			ChangeClientTeam(iClient, g_CvarBotTeam.IntValue);
 			SetEntityGravity(iClient, 400.0);
-			SetEntProp(iBot, Prop_Data, "m_takedamage", 1, 1);
+			SetEntProp(g_iBot, Prop_Data, "m_takedamage", 1, 1);
 			g_iWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
 		}
 	}
@@ -158,7 +159,7 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 
 public Action OnPlayerRunCmd(int iClient, int &iButtons, int &iImpulse, float fVelocity[3], float fAngles[3], int &iWeapon)
 {
-	if (g_bAttack && iClient == iBot && g_iWeapon != -1)
+	if (g_bAttack && iClient == g_iBot && g_iWeapon != -1)
 	{
 		SetEntPropFloat(g_iWeapon, Prop_Send, "m_flNextSecondaryAttack", 0.0);
 
@@ -174,7 +175,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 
 	int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
 
-	if (iClient != iBot) return;
+	if (iClient != g_iBot) return;
 
 	Flick();
 
@@ -187,7 +188,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 // ------------------ [Core function] -----------------------------
 public void OnGameFrame()
 {
-	if (!g_bEnable && iBot == -1) return;
+	if (!g_bEnable && g_iBot == -1) return;
 
 	float fBotPosition[3], fRocketPosition[3];
 	g_bAttack = false;
@@ -197,7 +198,7 @@ public void OnGameFrame()
 	{
 		int iRocket = TFDB_GetRocketEntity(iIndex);
 
-		GetClientEyePosition(iBot, fBotPosition);
+		GetClientEyePosition(g_iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
 
 		if (!g_bDeflectPause)
@@ -213,7 +214,7 @@ public void OnGameFrame()
 
 				if (GetVectorDistance(fBotPosition, fRocketPosition) <= GetVectorDistance(fBotPosition, fPlayerpos) * 0.45)
 				{
-					fAngle = GetAngleToTarget(iBot, iRocket);
+					fAngle = GetAngleToTarget(g_iBot, iRocket);
 				}
 			}
 
@@ -244,15 +245,15 @@ public void OnGameFrame()
 			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
 		}
 
-		if (GetVectorDistance(fBotPosition, fRocketPosition) <= g_iBotMoveDistance && GetEntProp(iRocket, Prop_Send, "m_iTeamNum") != GetClientTeam(iBot))
+		if (GetVectorDistance(fBotPosition, fRocketPosition) <= g_iBotMoveDistance && GetEntProp(iRocket, Prop_Send, "m_iTeamNum") != GetClientTeam(g_iBot))
 		{
 			float fAngle[3], fBotRocket[3];
 			MakeAngle(fRocketPosition, fBotPosition, fAngle);
 
-			if ((GetVectorDistance(fBotPosition, fRocketPosition) <= g_iDeflectRadius && GetAngleToTarget(iBot, iRocket) <= g_fRandomAngle/2)
+			if ((GetVectorDistance(fBotPosition, fRocketPosition) <= g_iDeflectRadius && GetAngleToTarget(g_iBot, iRocket) <= g_fRandomAngle/2)
 				|| GetVectorDistance(fBotPosition, fRocketPosition) <= g_iCriticalDefRadius)
 			{
-				TeleportEntity(iBot, NULL_VECTOR, fAngle, NULL_VECTOR);
+				TeleportEntity(g_iBot, NULL_VECTOR, fAngle, NULL_VECTOR);
 				g_bAttack = true;
 				g_bDeflectPause = false;
 
@@ -265,21 +266,24 @@ public void OnGameFrame()
 			}
 			else	// Orbit rocket
 			{
+				if (!g_bOrbit)
+					g_bOrbit = true;
+
 				MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
 
 				fBotRocket[2] = 0.0;
 				ScaleVector(fBotRocket, 9000.0);
-				TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+				TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
 			}
 		}
 		else
 		{
 			float fAngle[3], fTargetPosition[3], fNewPoint[3], fViewingAngleToRocket[3];
-			fTargetPosition = GetTargetPosition(iBot);
+			fTargetPosition = GetTargetPosition(g_iBot);
 
-			GetViewAnglesToTarget(iBot, fRocketPosition, fViewingAngleToRocket);
+			GetViewAnglesToTarget(g_iBot, fRocketPosition, fViewingAngleToRocket);
 
-			TeleportEntity(iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
+			TeleportEntity(g_iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
 
 			int iPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
 			if (IsValidClient(iPlayer, false, false))
@@ -299,7 +303,7 @@ public void OnGameFrame()
 					{
 						fNewPoint[2] = 0.0;
 						ScaleVector(fNewPoint, -1000.0);
-						TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
+						TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
 					}
 				}
 				else	// player-mimic
@@ -308,15 +312,22 @@ public void OnGameFrame()
 					GetClientEyePosition(g_iCurrentPlayer, fTargetPosition);
 					MakeAngle(fTargetPosition, fBotPosition, fAngle);
 
+					if (GetRandomInt(-20, 20) == 0)
+					{
+						RandomPosition(g_fRandomPosition);
+					}
+
+					SubtractVectors(fTargetPosition, g_fRandomPosition, fTargetPosition);
+
 					NegateVector(fTargetPosition);
 					MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
 					NormalizeVector(fNewPoint, fNewPoint);
 
-					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 25.0)
+					if (g_bDeflectPause && GetVectorDistance(fBotPosition, fTargetPosition) > 150.0)
 					{
 						fNewPoint[2] = 0.0;
 						ScaleVector(fNewPoint, -1500.0);
-						TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
+						TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fNewPoint);
 					}
 				}
 			}
@@ -364,6 +375,13 @@ void AngleFix(float fAngle[3])
 	fAngle[1] += 180.0;
 }
 
+void RandomPosition(float fPosition[3])
+{
+	fPosition[0] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
+	fPosition[1] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
+	fPosition[2] = 0.0;
+}
+
 void Flick()
 {
 	// So it seems like after doing some statistics "if" statements were more consistent in completion time ranging from ~0.087-0.107 in average it was ~0.1047
@@ -409,7 +427,7 @@ void Flick()
 		g_fGlobalAngle[1] += 360.0;
 	}
 
-	TeleportEntity(iBot, NULL_VECTOR, g_fGlobalAngle, NULL_VECTOR);
+	TeleportEntity(g_iBot, NULL_VECTOR, g_fGlobalAngle, NULL_VECTOR);
 }
 
 void AvoidRocket(const float fBotPos[3], const float fRocketPos[3])
@@ -430,7 +448,7 @@ void AvoidRocket(const float fBotPos[3], const float fRocketPos[3])
 
 	for	(int i = 0; i <= 4; i++)
 	{
-		TeleportEntity(iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+		TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
 	}
 }
 
@@ -478,7 +496,7 @@ void DisableMode()
 	// Restore everything to its default value
 	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 250");
 
-	iBot = -1;
+	g_iBot = -1;
 	g_iWeapon = -1;
 	g_iCurrentPlayer = -1;
 	g_bEnable = false;
@@ -633,7 +651,7 @@ void ParseConfig()
 
 	delete kv;
 
-	if (!(GetVectorDistance(g_fTargetPositions[0], NULL_VECTOR) <= 1.0 && GetVectorDistance(g_fTargetPositions[1], NULL_VECTOR) <= 1.0))
+	if (!(GetVectorDistance(g_fTargetPositions[0], NULL_VECTOR) <= 1.0 || GetVectorDistance(g_fTargetPositions[1], NULL_VECTOR) <= 1.0))
 	{
 		g_bBotFixed = true;
 	}
