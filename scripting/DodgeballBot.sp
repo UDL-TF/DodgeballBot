@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.5"
+#define PLUGIN_VERSION     "1.0.7"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -27,12 +27,15 @@ float g_fRandomAngle = 180.0;
 float g_fGlobalAngle[3];
 float g_fTargetPositions[2][3];
 float g_fRandomPosition[3];
+float g_fDragTimeMax;
+float g_fTime;
 
 bool g_bChoiceAngle 	= false;
 bool g_bAttack 			= false;
 bool g_bDeflectPause 	= true;
 bool g_bBotFixed		= false;
 bool g_bOrbit			= false;
+bool g_bFlick			= false;
 
 float g_fPVBVoteTime = 0.0;
 
@@ -177,7 +180,11 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 
 	if (iClient != g_iBot) return;
 
+	g_bFlick = true;
+
 	Flick();
+
+	g_fTime = GetEngineTime();
 
 	// reset the deflect radius to prevent other shots to be missed
 	g_iCriticalDefRadius = 100;
@@ -193,6 +200,11 @@ public void OnGameFrame()
 	float fBotPosition[3], fRocketPosition[3];
 	g_bAttack = false;
 
+	if (g_fTime + g_fDragTimeMax <= GetEngineTime())
+	{
+		g_bFlick = false;
+	}
+
 	int iIndex = -1;
 	while ((iIndex = FindNextValidRocket(iIndex)) != -1) // I used the same method to spin through valid rockets as in the dodgeball plugin
 	{
@@ -200,6 +212,8 @@ public void OnGameFrame()
 
 		GetClientEyePosition(g_iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
+
+		g_fDragTimeMax = TFDB_GetRocketClassDragTimeMax(TFDB_GetRocketClass(iIndex));
 
 		if (!g_bDeflectPause)
 		{
@@ -278,12 +292,25 @@ public void OnGameFrame()
 		}
 		else
 		{
-			float fAngle[3], fTargetPosition[3], fNewPoint[3], fViewingAngleToRocket[3];
+			float fAngle[3], fTargetPosition[3], fPlayerPosition[3], fNewPoint[3], fViewingAngleToRocket[3];
 			fTargetPosition = GetTargetPosition(g_iBot);
 
 			GetViewAnglesToTarget(g_iBot, fRocketPosition, fViewingAngleToRocket);
 
-			TeleportEntity(g_iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
+			if (g_iCurrentPlayer != -1 && g_bFlick && !g_bOrbit && GetRandomInt(-20, 20) == 4)
+			{
+				GetClientEyePosition(g_iCurrentPlayer, fPlayerPosition);
+				fPlayerPosition[2] -= 20.0;
+
+				GetViewAnglesToTarget(g_iBot, fPlayerPosition, fViewingAngleToRocket);
+				//CPrintToChatAll("%.4f %.4f %.4f", fViewingAngleToRocket[0], fViewingAngleToRocket[1], fViewingAngleToRocket[2]);
+
+				TeleportEntity(g_iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
+			}
+
+			if (!g_bFlick)
+				TeleportEntity(g_iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
+
 
 			int iPlayer = EntRefToEntIndex(TFDB_GetRocketTarget(iIndex));
 			if (IsValidClient(iPlayer, false, false))
@@ -314,7 +341,7 @@ public void OnGameFrame()
 
 					if (GetRandomInt(-20, 20) == 0)
 					{
-						RandomPosition(g_fRandomPosition);
+						g_fRandomPosition = RandomPosition();
 					}
 
 					SubtractVectors(fTargetPosition, g_fRandomPosition, fTargetPosition);
@@ -375,11 +402,14 @@ void AngleFix(float fAngle[3])
 	fAngle[1] += 180.0;
 }
 
-void RandomPosition(float fPosition[3])
+float[] RandomPosition()
 {
+	float fPosition[3];
 	fPosition[0] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
 	fPosition[1] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
 	fPosition[2] = 0.0;
+
+	return fPosition;
 }
 
 void Flick()
@@ -392,17 +422,17 @@ void Flick()
 	}
 	else
 	{
-		switch (GetRandomInt(5, 10)) //here the switch stayed for convenience
+		switch (GetRandomInt(1, 6)) //here the switch stayed for convenience
 		{
-			case 5:
+			case 1:
 			{
-				g_fGlobalAngle[1] += GetRandomFloat(-20.0, 20.0);
+				g_fGlobalAngle[1] += GetRandomFloat(-40.0, 20.0);
 			}
-			case 6, 7, 8:
+			case 2, 3:
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
 			}
-			case 9, 10:
+			case 4, 5, 6:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
 			}
@@ -717,7 +747,7 @@ void ParseMaps(KeyValues kv)
 }
 
 // ------------- [Stocks] --------------------
-float[] GetTargetPosition(int iClient)
+float[] GetTargetPosition(int &iClient)
 {
 	int iTeam = GetClientTeam(iClient);
 
@@ -731,7 +761,7 @@ float[] GetTargetPosition(int iClient)
 	}
 }
 
-void GetViewAnglesToTarget(int iClient, const float fTargetPosition[3], float fAngleOutput[3])
+void GetViewAnglesToTarget(int &iClient, const float fTargetPosition[3], float fAngleOutput[3])
 { 
 	float fClientEyes[3], fPositionalVector[3];
 
@@ -796,7 +826,7 @@ int GetRealClientCount(bool bInGameOnly = true)
 	return iCount;
 }
 
-bool IsValidClient(int iClient, bool bAllowBots = false, bool bAllowDead = true)
+bool IsValidClient(int &iClient, bool bAllowBots = false, bool bAllowDead = true)
 {
 	if (!(1 <= iClient <= MaxClients) || !IsClientInGame(iClient) || (IsFakeClient(iClient) && !bAllowBots)
 		|| IsClientSourceTV(iClient) || IsClientReplay(iClient) || (!bAllowDead && !IsPlayerAlive(iClient)))
