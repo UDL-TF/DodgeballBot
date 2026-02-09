@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.7"
+#define PLUGIN_VERSION     "1.0.8"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -35,6 +35,7 @@ bool g_bAttack 			= false;
 bool g_bDeflectPause 	= true;
 bool g_bBotFixed		= false;
 bool g_bOrbit			= false;
+bool g_bTrackRocket		= false;
 bool g_bFlick			= false;
 
 float g_fPVBVoteTime = 0.0;
@@ -72,7 +73,7 @@ public Plugin myinfo =
 public void OnPluginStart()
 {
 	RegAdminCmd("sm_pvb", PVB_Cmd, ADMFLAG_GENERIC, "Toggle command for dodgeball bot.");
-	RegAdminCmd("sm_pvb_reloadcfg", PVB_ReloadCfg, ADMFLAG_CONVARS, "Reloads the bot config.");
+	RegAdminCmd("sm_pvb_reloadcfg", PVB_ReloadCfg, ADMFLAG_GENERIC, "Reloads the bot config.");
 	RegConsoleCmd("sm_votepvb", VotePvB_Cmd);
 
 	g_CvarPVBenable 	= CreateConVar("tf_dodgeball_bot_enable", "1", "Enable/disable player vs bot mode.", _ ,true, 0.0, true, 1.0);
@@ -190,6 +191,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 	g_iCriticalDefRadius = 100;
 	g_iDeflectRadius = 285;
 	g_bOrbit = false;
+	g_bTrackRocket = true;
 }
 
 // ------------------ [Core function] -----------------------------
@@ -236,7 +238,8 @@ public void OnGameFrame()
 
 			RocketState iRocketState = TFDB_GetRocketState(iIndex);
 			
-			if (!g_bBotFixed && !(iRocketState & RocketState_Bouncing || iRocketState & RocketState_Dragging) && g_fOrbitAngleMin < fAngle < g_fOrbitAngleMax)
+			if (!g_bBotFixed && !g_bOrbit && !(iRocketState & RocketState_Bouncing || iRocketState & RocketState_Dragging) 
+				&& g_fOrbitAngleMin < fAngle < g_fOrbitAngleMax && fRocketPosition[2] >= fBotPosition[2] + 50.0)
 			{
 				g_iDeflectRadius = 0;
 				g_bOrbit = true;
@@ -244,8 +247,14 @@ public void OnGameFrame()
 				if (TFDB_GetRocketMphSpeed(iIndex) < g_fOrbitMaxRocketSpeed)	// Had to use mph its a much smaller number to work with than hammer
 				{
 					g_iCriticalDefRadius = 40;
+					//CPrintToChatAll("orbit");
 
-					CreateTimer(GetRandomFloat(g_fOrbitTimeMin, g_fOrbitTimeMax), Timer_ResetDistance);
+					float forbTime = GetRandomFloat(g_fOrbitTimeMin, g_fOrbitTimeMax);
+					CreateTimer(forbTime, Timer_ResetDistance);
+
+					CreateTimer(0.1, Timer_StartOrb);
+
+					CreateTimer(forbTime - 0.15, Timer_EndOrb);
 				}
 			}
 			else	
@@ -297,7 +306,7 @@ public void OnGameFrame()
 
 			GetViewAnglesToTarget(g_iBot, fRocketPosition, fViewingAngleToRocket);
 
-			if (g_iCurrentPlayer != -1 && g_bFlick && !g_bOrbit && GetRandomInt(-20, 20) == 4)
+			if (g_iCurrentPlayer != -1 && g_bFlick && !g_bOrbit && GetRandomInt(-10, 10) == 2)
 			{
 				GetClientEyePosition(g_iCurrentPlayer, fPlayerPosition);
 				fPlayerPosition[2] -= 20.0;
@@ -308,7 +317,7 @@ public void OnGameFrame()
 				TeleportEntity(g_iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
 			}
 
-			if (!g_bFlick)
+			if (!g_bFlick && !g_bTrackRocket)
 				TeleportEntity(g_iBot, NULL_VECTOR, fViewingAngleToRocket, NULL_VECTOR);
 
 
@@ -422,17 +431,17 @@ void Flick()
 	}
 	else
 	{
-		switch (GetRandomInt(1, 6)) //here the switch stayed for convenience
+		switch (GetRandomInt(1, 7)) //here the switch stayed for convenience
 		{
 			case 1:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(-40.0, 20.0);
 			}
-			case 2, 3:
+			case 2, 3, 4:
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
 			}
-			case 4, 5, 6:
+			case 5, 6, 7:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
 			}
@@ -497,6 +506,21 @@ public Action Timer_ResetDistance(Handle hTimer)
 
 	return Plugin_Stop;
 }
+
+public Action Timer_StartOrb(Handle hTimer)
+{
+	g_bTrackRocket = false;
+
+	return Plugin_Stop;
+}
+
+public Action Timer_EndOrb(Handle hTimer)
+{
+	g_bTrackRocket = true;
+
+	return Plugin_Stop;
+}
+
 
 // ---------------- [Enable / Disable] ---------------------
 void EnableMode()
