@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.0.9"
+#define PLUGIN_VERSION     "1.1.0"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -83,6 +83,7 @@ public void OnPluginStart()
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("object_deflected", OnObjectDeflected);
+	HookEvent("player_team", OnPlayerTeam);
 
 	LoadTranslations("tfdb.phrases.txt");
 
@@ -141,12 +142,7 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 	}
 	else
 	{
-		if (IsValidClient(iClient))
-		{
-			if (GetClientTeam(iClient) == g_CvarBotTeam.IntValue)
-				ChangeClientTeam(iClient, AnalogueTeam(g_CvarBotTeam.IntValue));
-		}
-		else
+		if (!IsValidClient(iClient))
 		{
 			g_iBot = iClient;
 
@@ -155,6 +151,18 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 			SetEntProp(g_iBot, Prop_Data, "m_takedamage", 1, 1);
 			g_iWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
 		}
+	}
+
+	return Plugin_Continue;
+}
+
+public Action OnPlayerTeam(Handle hEvent, char[] strEventName, bool bDontBroadcast)
+{
+	int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
+
+	if (IsValidClient(iClient) && GetClientTeam(iClient) == g_CvarBotTeam.IntValue)
+	{
+		ChangeClientTeam(iClient, AnalogueTeam(g_CvarBotTeam.IntValue));
 	}
 
 	return Plugin_Continue;
