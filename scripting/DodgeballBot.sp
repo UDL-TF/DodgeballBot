@@ -160,7 +160,7 @@ public Action OnPlayerTeam(Handle hEvent, char[] strEventName, bool bDontBroadca
 {
 	int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
 
-	if (IsValidClient(iClient) && GetClientTeam(iClient) == g_CvarBotTeam.IntValue)
+	if (g_bEnable && IsValidClient(iClient) && GetClientTeam(iClient) == g_CvarBotTeam.IntValue)
 	{
 		ChangeClientTeam(iClient, AnalogueTeam(g_CvarBotTeam.IntValue));
 	}
