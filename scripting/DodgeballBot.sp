@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.1"
+#define PLUGIN_VERSION     "1.1.2"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -536,6 +536,8 @@ void DisableMode()
 	// Restore everything to its default value
 	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 250");
 	ServerCommand("mp_humans_must_join_team any");
+
+	ServerCommand("mp_scrambleteams");
 
 	g_iBot = -1;
 	g_iWeapon = -1;
