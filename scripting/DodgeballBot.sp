@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.0"
+#define PLUGIN_VERSION     "1.1.1"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -83,7 +83,6 @@ public void OnPluginStart()
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("object_deflected", OnObjectDeflected);
-	HookEvent("player_team", OnPlayerTeam);
 
 	LoadTranslations("tfdb.phrases.txt");
 
@@ -151,18 +150,6 @@ public Action OnPlayerSpawn(Handle hEvent, char[] strEventName, bool bDontBroadc
 			SetEntProp(g_iBot, Prop_Data, "m_takedamage", 1, 1);
 			g_iWeapon = GetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon");
 		}
-	}
-
-	return Plugin_Continue;
-}
-
-public Action OnPlayerTeam(Handle hEvent, char[] strEventName, bool bDontBroadcast)
-{
-	int iClient = GetClientOfUserId(GetEventInt(hEvent, "userid"));
-
-	if (g_bEnable && IsValidClient(iClient) && GetClientTeam(iClient) == g_CvarBotTeam.IntValue)
-	{
-		ChangeClientTeam(iClient, AnalogueTeam(g_CvarBotTeam.IntValue));
 	}
 
 	return Plugin_Continue;
@@ -529,6 +516,7 @@ void EnableMode()
 	ServerCommand("sm_cvar tf_bot_quota 0");
 	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 0");
 	ServerCommand("mp_autoteambalance 0");
+	ServerCommand("mp_humans_must_join_team %s", g_CvarBotTeam.IntValue == 2 ? "blue" : "red");
 
 	ServerCommand("tf_bot_add 1 Pyro %s easy \"%s\"", g_CvarBotTeam.IntValue == 2 ? "red" : "blue", g_strBotName);	// Creating the bot
 	ServerCommand("tf_bot_difficulty 0");
@@ -547,6 +535,7 @@ void DisableMode()
 {
 	// Restore everything to its default value
 	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 250");
+	ServerCommand("mp_humans_must_join_team any");
 
 	g_iBot = -1;
 	g_iWeapon = -1;
