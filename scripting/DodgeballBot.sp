@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.2"
+#define PLUGIN_VERSION     "1.1.3"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -39,7 +39,7 @@ bool g_bFlick			= false;
 
 float g_fPVBVoteTime = 0.0;
 
-char g_strBotName[MAX_NAME_LENGTH];
+char 	g_strBotName[MAX_NAME_LENGTH];
 int 	g_iDeflectRadiusMin;
 int 	g_iDeflectRadiusMax;
 float 	g_fDragXMin;
@@ -122,7 +122,7 @@ public void OnClientDisconnect(int iClient)
 	}
 }
 
-public void OnClientConnected(int iClient)
+public void OnClientPutInServer(int iClient)
 {
 	if (g_CvarBotAutoJoin.BoolValue && !g_bEnable && GetRealClientCount(false) == 1)
 	{
