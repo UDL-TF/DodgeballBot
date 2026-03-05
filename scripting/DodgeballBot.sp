@@ -1,15 +1,15 @@
 #pragma semicolon 1
 #pragma newdecls required
 
-#include <sourcemod>
-#include <tf2_stocks>
-#include <multicolors>
 #include <tfdb>
+#include <tf2_stocks>
+#include <sourcemod>
+#include <multicolors>
 
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.3"
+#define PLUGIN_VERSION     "1.1.4"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -113,7 +113,7 @@ public void OnClientDisconnect(int iClient)
 	{
 		if (iClient == g_iBot || GetRealClientCount(false) == 0)
 		{
-			DisableMode();
+			CreateTimer(1.0, Timer_Disable, _, TIMER_FLAG_NO_MAPCHANGE);
 		}
 		else if (iClient == g_iCurrentPlayer)	//This is to ensure that the bot doesn't try to mimic a disconnected player
 		{
@@ -251,7 +251,7 @@ public void OnGameFrame()
 			}
 
 			if (!g_bBotFixed && g_bOrbit && fAngle < g_fAvoidRocketAngle)
-				AvoidRocket(fBotPosition, fRocketPosition);
+				AvoidRocket(fBotPosition, fRocketPosition, g_fOrbitDegree);
 
 			g_fRandomAngle = ((g_iDeflectRadius + 1.0)/2.0) + 45.0;
 		}
@@ -279,11 +279,7 @@ public void OnGameFrame()
 				g_bDeflectPause = false;
 
 				if (!g_bChoiceAngle)
-				{
-					g_fGlobalAngle[0] = fAngle[0];
-					g_fGlobalAngle[1] = fAngle[1];
-					g_fGlobalAngle[2] = fAngle[2];
-				}
+					CopyVectors(fAngle, g_fGlobalAngle);
 			}
 			else	// Orbit rocket
 			{
@@ -363,17 +359,16 @@ public void OnGameFrame()
 			if (g_bChoiceAngle)
 			{
 				g_bChoiceAngle = false;
-				g_fGlobalAngle[0] = fAngle[0];
-				g_fGlobalAngle[1] = fAngle[1];
-				g_fGlobalAngle[2] = fAngle[2];
+
+				CopyVectors(fAngle, g_fGlobalAngle);
 			}
 		}
 	}
 }
 
-int FindNextValidRocket(const int &iIndex)
+int FindNextValidRocket(const int &index)
 {
-	for (int i = iIndex + 1; i < MAX_ROCKETS; i++)
+	for (int i = index + 1; i < MAX_ROCKETS; i++)
 	{
 		if (TFDB_IsValidRocket(i)) return i;
 	}
@@ -381,36 +376,36 @@ int FindNextValidRocket(const int &iIndex)
 	return -1;
 }
 
-void MakeAngle(const float fPos1[3], const float fPos2[3], float fOutput[3])
+void MakeAngle(const float pos1[3], const float pos2[3], float angle[3])
 {
-	float fBuffer[3];
-	MakeVectorFromPoints(fPos1, fPos2, fBuffer);
-	NormalizeVector(fBuffer, fBuffer);
-	GetVectorAngles(fBuffer, fOutput);
-	AngleFix(fOutput);
+	float buffer[3];
+	MakeVectorFromPoints(pos1, pos2, buffer);
+	NormalizeVector(buffer, buffer);
+	GetVectorAngles(buffer, angle);
+	AngleFix(angle);
 }
 
-void AngleFix(float fAngle[3])
+void AngleFix(float angle[3])
 {
-	fAngle[0] *= -1.0;
+	angle[0] *= -1.0;
 
-	if (fAngle[0] > 270)
-		fAngle[0] -=360.0;
+	if (angle[0] > 270)
+		angle[0] -=360.0;
 
-	if (fAngle[0] < -180.0)
-		fAngle[0] += 360.0;
+	if (angle[0] < -180.0)
+		angle[0] += 360.0;
 
-	fAngle[1] += 180.0;
+	angle[1] += 180.0;
 }
 
 float[] RandomPosition()
 {
-	float fPosition[3];
-	fPosition[0] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
-	fPosition[1] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
-	fPosition[2] = 0.0;
+	float pos[3];
+	pos[0] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
+	pos[1] = GetRandomFloat(150.0, 600.0) * GetRandomFloat(-1.0, 1.0);
+	pos[2] = 0.0;
 
-	return fPosition;
+	return pos;
 }
 
 void Flick()
@@ -461,19 +456,22 @@ void Flick()
 	TeleportEntity(g_iBot, NULL_VECTOR, g_fGlobalAngle, NULL_VECTOR);
 }
 
-void AvoidRocket(const float fBotPos[3], const float fRocketPos[3])
+/** AvoidRocket()
+**
+** Avoids a incoming rocket in a specific degree. */
+void AvoidRocket(const float fBotPos[3], const float fRocketPos[3], float orbitdegree)
 {
 	float fBotRocket[3];
 	MakeVectorFromPoints(fRocketPos, fBotPos, fBotRocket);
 
 	if (fBotRocket[0] < 0 || fBotRocket[1] < 0)
 	{
-		g_fOrbitDegree *= -1.0;
+		orbitdegree *= -1.0;
 	}
 
 	float x = fBotRocket[0], y = fBotRocket[1]; fBotRocket[2] = 0.0;
-	fBotRocket[0] = x * Cosine(DegToRad(g_fOrbitDegree)) - y * Sine(DegToRad(g_fOrbitDegree));
-	fBotRocket[1] = x * Sine(DegToRad(g_fOrbitDegree)) + y * Cosine(DegToRad(g_fOrbitDegree));
+	fBotRocket[0] = x * Cosine(DegToRad(orbitdegree)) - y * Sine(DegToRad(orbitdegree));
+	fBotRocket[1] = x * Sine(DegToRad(orbitdegree)) + y * Cosine(DegToRad(orbitdegree));
 
 	ScaleVector(fBotRocket, -15000.0); // Ik it's a big ass scale
 
@@ -525,7 +523,7 @@ void EnableMode()
 	ServerCommand("tf_bot_join_after_player 0");
 
 	ChangeClientsTeam();	// Changing already joined players teams
-	
+
 	g_bEnable = true;
 
 	CPrintToChatAll("%t", "PVB_Enable");
@@ -852,11 +850,11 @@ bool IsValidClient(int &iClient, bool bAllowBots = false, bool bAllowDead = true
 
 void ChangeClientsTeam()
 {
-	for (int iClient = 1; iClient <= MaxClients; iClient++)
+	for (int client = 1; client <= MaxClients; client++)
 	{
-		if (IsValidClient(iClient) && GetClientTeam(iClient) == g_CvarBotTeam.IntValue)
+		if (IsValidClient(client) && GetClientTeam(client) == g_CvarBotTeam.IntValue)
 		{
-			ChangeClientTeam(iClient, AnalogueTeam(g_CvarBotTeam.IntValue));
+			ChangeClientTeam(client, AnalogueTeam(g_CvarBotTeam.IntValue));
 		}
 	}
 }
@@ -864,4 +862,22 @@ void ChangeClientsTeam()
 void CleanBots()
 {
 	ServerCommand("tf_bot_kick all");
+}
+
+public Action Timer_Disable(Handle hTimer) 
+{
+	DisableMode();
+
+	return Plugin_Stop;
+}
+
+/** CopyVectors()
+**
+** Copies a vector into b.
+**/
+void CopyVectors(const float a[3], float b[3])
+{
+	b[0] = a[0];
+	b[1] = a[1];
+	b[2] = a[2];
 }
