@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.4"
+#define PLUGIN_VERSION     "1.1.5"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -39,6 +39,9 @@ bool g_bFlick			= false;
 
 float g_fPVBVoteTime = 0.0;
 
+int g_iStalemate;
+int g_iAutoBalance;
+
 char 	g_strBotName[MAX_NAME_LENGTH];
 int 	g_iDeflectRadiusMin;
 int 	g_iDeflectRadiusMax;
@@ -59,6 +62,7 @@ ConVar g_CvarVoteCooldown;
 ConVar g_CvarBotTeam;
 ConVar g_CvarBotAutoJoin;
 ConVar g_CvarCleanBotsWhenInactive;
+ConVar g_CvarKeepServerSettings;
 
 public Plugin myinfo = 
 {
@@ -80,6 +84,8 @@ public void OnPluginStart()
 	g_CvarBotTeam 		= CreateConVar("tf_dodgeball_bot_team", "3", "The default team for the bot, 2 - Red, 3 - Blu.", _, true, 2.0, true, 3.0);
 	g_CvarBotAutoJoin 	= CreateConVar("tf_dodgeball_bot_autojoin", "1", "Enable/ disable autojoin for bot when a player joins the server.", _, true, 0.0, true, 1.0);
 	g_CvarCleanBotsWhenInactive = CreateConVar("tf_dodgeball_bot_cleanbots", "1", "Should this plugin kick bots when it's not active?", _, true, 0.0, true, 1.0);
+	g_CvarKeepServerSettings = CreateConVar("tf_dodgeball_reset_changes", "1", "Should the plugin reset changes made to convars, etc. after it's disabled", _, true, 0.0, true, 0.0);
+
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("object_deflected", OnObjectDeflected);
@@ -185,6 +191,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 	g_iCriticalDefRadius = 100;
 	g_iDeflectRadius = 285;
 	g_bOrbit = false;
+	g_bAttack = false;
 }
 
 // ------------------ [Core function] -----------------------------
@@ -193,9 +200,8 @@ public void OnGameFrame()
 	if (!g_bEnable && g_iBot == -1) return;
 
 	float fBotPosition[3], fRocketPosition[3];
-	g_bAttack = false;
 
-	if (g_fTime + g_fDragTimeMax <= GetEngineTime())
+	if (g_bFlick && g_fTime + g_fDragTimeMax <= GetEngineTime())
 	{
 		g_bFlick = false;
 	}
@@ -418,17 +424,17 @@ void Flick()
 	}
 	else
 	{
-		switch (GetRandomInt(1, 7)) //here the switch stayed for convenience
+		switch (GetRandomInt(1, 8)) //here the switch stayed for convenience
 		{
-			case 1:
+			case 1, 2:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(-40.0, 20.0);
 			}
-			case 2, 3, 4:
+			case 3, 4, 5:
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
 			}
-			case 5, 6, 7:
+			case 6, 7, 8:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
 			}
@@ -510,17 +516,27 @@ void EnableMode()
 {
 	CleanBots();	// Kicking any other bot that might be present
 
-	ServerCommand("sm_cvar tf_bot_quota_mode normal"); // Setting up the server for the mode
-	ServerCommand("sm_cvar tf_bot_quota 0");
-	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 0");
-	ServerCommand("mp_autoteambalance 0");
-	ServerCommand("mp_humans_must_join_team %s", g_CvarBotTeam.IntValue == 2 ? "blue" : "red");
+	ServerCommand("tf_bot_quota_mode normal"); // Setting up the server for the mode
+	ServerCommand("tf_bot_quota 0");
+	ServerCommand("tf_bot_pyro_shove_away_range 0");
 
 	ServerCommand("tf_bot_add 1 Pyro %s easy \"%s\"", g_CvarBotTeam.IntValue == 2 ? "red" : "blue", g_strBotName);	// Creating the bot
 	ServerCommand("tf_bot_difficulty 0");
 	ServerCommand("tf_bot_keep_class_after_death 1");
 	ServerCommand("tf_bot_taunt_victim_chance 0");
 	ServerCommand("tf_bot_join_after_player 0");
+
+	g_iStalemate = GetConVarInt(FindConVar("mp_stalemate_enable"));
+
+	if (!g_iStalemate)
+		ServerCommand("mp_stalemate_enable 1");
+
+	g_iAutoBalance = GetConVarInt(FindConVar("mp_autoteambalance"));
+
+	if (g_iAutoBalance)
+		ServerCommand("mp_autoteambalance 0");
+
+	ServerCommand("mp_humans_must_join_team %s", g_CvarBotTeam.IntValue == 2 ? "blue" : "red");
 
 	ChangeClientsTeam();	// Changing already joined players teams
 
@@ -532,8 +548,14 @@ void EnableMode()
 void DisableMode()
 {
 	// Restore everything to its default value
-	ServerCommand("sm_cvar tf_bot_pyro_shove_away_range 250");
+	ServerCommand("tf_bot_pyro_shove_away_range 250");
 	ServerCommand("mp_humans_must_join_team any");
+
+	if (g_CvarKeepServerSettings.BoolValue)
+	{
+		ServerCommand("mp_stalemate_enable %i", g_iStalemate);
+		ServerCommand("mp_autoteambalance %i", g_iAutoBalance);
+	}
 
 	ServerCommand("mp_scrambleteams");
 
