@@ -18,6 +18,7 @@
     tf_dodgeball_bot_team             "3"     - The default team for the bot, 2 - Red, 3 - Blu.
     tf_dodgeball_bot_autojoin         "1"     - Enable/disable autojoin for bot when a player joins the server.
     tf_dodgeball_bot_cleanbots        "1"     - Should this plugin kick bots when it's not active?
+    tf_dodgeball_reset_changes        "1"     - Reset server changes when disabling the bot? 
 ```
 # Requirements
 - [Multi-Colors](https://github.com/Bara/Multi-Colors) only for compiling.
