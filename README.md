@@ -21,7 +21,7 @@
 ```
 # Requirements
 - [Multi-Colors](https://github.com/Bara/Multi-Colors) only for compiling.
-- [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) is a mandatory requirement not just for compiling also for functioning.
+- [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) (2.0.0 or older version) is a mandatory requirement not just for compiling also for functioning.
 
 # Installation
 Download the stable release for the best results. Then unzip the file.
