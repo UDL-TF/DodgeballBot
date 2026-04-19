@@ -24,9 +24,6 @@
 - [Multi-Colors](https://github.com/Bara/Multi-Colors) only for compiling.
 - [TF2Dodgeball](https://github.com/Silorak/TF2-Dodgeball-Modified) is a mandatory requirement not just for compiling also for functioning.
 
-> [!NOTE]
-> **This plugin only works with dodgeball plugin versions 2.0.0 or older!**
-
 # Installation
 Download the stable release for the best results. Then unzip the file.
 
