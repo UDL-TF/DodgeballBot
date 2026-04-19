@@ -64,6 +64,15 @@ ConVar g_CvarBotAutoJoin;
 ConVar g_CvarCleanBotsWhenInactive;
 ConVar g_CvarKeepServerSettings;
 
+enum struct PlayerData {
+	float dist;
+	//angles
+	float x;
+	float y;
+}
+
+PlayerData Player[MAXPLAYERS + 1];
+
 public Plugin myinfo = 
 {
 	name		= PLUGIN_NAME,
@@ -85,7 +94,6 @@ public void OnPluginStart()
 	g_CvarBotAutoJoin 	= CreateConVar("tf_dodgeball_bot_autojoin", "1", "Enable/ disable autojoin for bot when a player joins the server.", _, true, 0.0, true, 1.0);
 	g_CvarCleanBotsWhenInactive = CreateConVar("tf_dodgeball_bot_cleanbots", "1", "Should this plugin kick bots when it's not active?", _, true, 0.0, true, 1.0);
 	g_CvarKeepServerSettings = CreateConVar("tf_dodgeball_reset_changes", "1", "Should the plugin reset changes made to convars, etc. after it's disabled", _, true, 0.0, true, 0.0);
-
 
 	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
 	HookEvent("object_deflected", OnObjectDeflected);
@@ -321,6 +329,8 @@ public void OnGameFrame()
 
 			if (g_iCurrentPlayer != -1 && !g_bOrbit)
 			{
+				GetPlayerData(g_iCurrentPlayer);
+
 				if (g_bBotFixed)	// fixed-position
 				{
 					MakeVectorFromPoints(fTargetPosition, fBotPosition, fNewPoint);
@@ -424,9 +434,9 @@ void Flick()
 	}
 	else
 	{
-		switch (GetRandomInt(1, 8)) //here the switch stayed for convenience
+		/*switch (GetRandomInt(1, 8)) //here the switch stayed for convenience
 		{
-			case 1, 2:
+			case 1:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(-40.0, 20.0);
 			}
@@ -434,10 +444,21 @@ void Flick()
 			{
 				g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
 			}
-			case 6, 7, 8:
+			case 2, 6, 7, 8:
 			{
 				g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
 			}
+		}*/
+
+		if (FloatAbs(Player[0].x) >= Player[0].y && GetRandomInt(1, 10) <= (10 * Player[0].dist))
+		{
+			g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
+			//float fvalue = GetRandomFloat(0.0, g_fDragXMax * FloatAbs(Player[0].x));
+			//g_fGlobalAngle[0] += Player[0].x >= 0 ? fvalue : -1 * fvalue;
+		}
+		else
+		{
+			g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
 		}
 	}
 
@@ -902,4 +923,34 @@ void CopyVectors(const float a[3], float b[3])
 	b[0] = a[0];
 	b[1] = a[1];
 	b[2] = a[2];
+}
+
+void GetPlayerData(int iClient)
+{
+	float playerpos[3], playereyeangle[3], botpos[3], boteyeangle[3];
+
+	GetClientEyePosition(iClient, playerpos);
+	//CPrintToChatAll("1: %.3f %.3f %.3f", playerpos[0], playerpos[1], playerpos[2]);
+	GetClientEyeAngles(iClient, playereyeangle);
+	//CPrintToChatAll("2: %.3f %.3f %.3f", playereyeangle[0], playereyeangle[1], playereyeangle[2]);
+	GetClientEyePosition(g_iBot, botpos);
+	//CPrintToChatAll("3: %.3f %.3f %.3f", botpos[0], botpos[1], botpos[2]);
+	GetClientEyeAngles(g_iBot, boteyeangle);
+	//CPrintToChatAll("4: %.3f %.3f %.3f", boteyeangle[0], boteyeangle[1], boteyeangle[2]);
+
+	float distweight = GetVectorDistance(botpos, playerpos) < 400.0 ? 1.0 : (400.0 / GetVectorDistance(botpos, playerpos));
+	//CPrintToChatAll("dist: %.3f", distweight );
+
+	float angweightx = 0.15 + playereyeangle[0] / 90.0;
+	//CPrintToChatAll("x: %.3f", angweightx);
+
+    float angweighty = GetAngleToTarget(iClient, g_iBot) / 180.0;
+	//CPrintToChatAll("y: %.3f", angweighty);
+
+	Player[0].dist = (Player[0].dist + distweight) / 2;
+	//CPrintToChatAll("dist: %.3f", Player[0].dist);
+	Player[0].x = (Player[0].x + angweightx) / 2;
+	//CPrintToChatAll("x: %.3f", Player[0].x );
+	Player[0].y = (Player[0].y + angweighty) / 2;
+	//CPrintToChatAll("y: %.3f", Player[0].y);
 }
