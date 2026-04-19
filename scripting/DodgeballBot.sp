@@ -27,7 +27,6 @@ float g_fRandomAngle = 180.0;
 float g_fGlobalAngle[3];
 float g_fTargetPositions[2][3];
 float g_fRandomPosition[3];
-float g_fDragTimeMax;
 float g_fTime;
 
 bool g_bChoiceAngle 	= false;
@@ -201,7 +200,7 @@ public void OnGameFrame()
 
 	float fBotPosition[3], fRocketPosition[3];
 
-	if (g_bFlick && g_fTime + g_fDragTimeMax <= GetEngineTime())
+	if (g_bFlick && g_fTime + 0.7 <= GetEngineTime())
 	{
 		g_bFlick = false;
 	}
@@ -213,8 +212,6 @@ public void OnGameFrame()
 
 		GetClientEyePosition(g_iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
-
-		g_fDragTimeMax = TFDB_GetRocketClassDragTimeMax(TFDB_GetRocketClass(iIndex));
 
 		if (!g_bDeflectPause)
 		{
