@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.5"
+#define PLUGIN_VERSION     "1.1.6"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -209,6 +209,9 @@ public void OnGameFrame()
 	while ((iIndex = FindNextValidRocket(iIndex)) != -1) // I used the same method to spin through valid rockets as in the dodgeball plugin
 	{
 		int iRocket = TFDB_GetRocketEntity(iIndex);
+
+		if (!IsValidClient(g_iBot, true))
+			DisableMode();
 
 		GetClientEyePosition(g_iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
