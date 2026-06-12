@@ -30,6 +30,10 @@ float g_fRandomPosition[3];
 float g_fDragTimeMax;
 float g_fTime;
 
+float g_fPlayerDist;
+float g_fPlayerViewX;
+float g_fPlayerViewY;
+
 bool g_bChoiceAngle 	= false;
 bool g_bAttack 			= false;
 bool g_bDeflectPause 	= true;
@@ -64,14 +68,7 @@ ConVar g_CvarBotAutoJoin;
 ConVar g_CvarCleanBotsWhenInactive;
 ConVar g_CvarKeepServerSettings;
 
-enum struct PlayerData {
-	float dist;
-	//angles
-	float x;
-	float y;
-}
 
-PlayerData Player[MAXPLAYERS + 1];
 
 public Plugin myinfo = 
 {
@@ -297,14 +294,17 @@ public void OnGameFrame()
 			}
 			else	// Orbit rocket
 			{
-				if (!g_bOrbit)
-					g_bOrbit = true;
+				if (TFDB_GetRocketMphSpeed(iIndex) < g_fOrbitMaxRocketSpeed + 50.0)
+				{
+					if (!g_bOrbit)
+						g_bOrbit = true;
 
-				MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
+					MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
 
-				fBotRocket[2] = 0.0;
-				ScaleVector(fBotRocket, 9000.0);
-				TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+					fBotRocket[2] = 0.0;
+					ScaleVector(fBotRocket, 9000.0);
+					TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+				}
 			}
 		}
 		else
@@ -450,15 +450,15 @@ void Flick()
 			}
 		}*/
 
-		if (FloatAbs(Player[0].x) >= Player[0].y && GetRandomInt(1, 10) <= (10 * Player[0].dist))
-		{
-			g_fGlobalAngle[0] += GetRandomFloat(g_fDragXMin, g_fDragXMax);
-			//float fvalue = GetRandomFloat(0.0, g_fDragXMax * FloatAbs(Player[0].x));
-			//g_fGlobalAngle[0] += Player[0].x >= 0 ? fvalue : -1 * fvalue;
+		if (FloatAbs(g_fPlayerViewX) >= g_fPlayerViewY)
+		{	
+			float num = g_fDragXMin + (g_fDragXMax - g_fDragXMin) * Pow(GetRandomFloat(0.0, 1.0), (1 - FloatAbs(g_fPlayerViewX)) / FloatAbs(g_fPlayerViewX));
+			g_fGlobalAngle[0] += g_fPlayerViewX > 0 ? num : -1.0 * num;
 		}
 		else
 		{
-			g_fGlobalAngle[1] += GetRandomFloat(g_fDragYMin, g_fDragYMax);
+			float num = g_fDragYMin + (g_fDragYMax - g_fDragYMin) * Pow(GetRandomFloat(0.0, 1.0), (1 - FloatAbs(g_fPlayerViewY)) / FloatAbs(g_fPlayerViewY));
+			g_fGlobalAngle[1] += num * GetRandomInt(-1, 1);
 		}
 	}
 
@@ -939,7 +939,7 @@ void GetPlayerData(int iClient)
 	//CPrintToChatAll("4: %.3f %.3f %.3f", boteyeangle[0], boteyeangle[1], boteyeangle[2]);
 
 	float distweight = GetVectorDistance(botpos, playerpos) < 400.0 ? 1.0 : (400.0 / GetVectorDistance(botpos, playerpos));
-	//CPrintToChatAll("dist: %.3f", distweight );
+	//CPrintToChatAll("dist: %.3f", distweight);
 
 	float angweightx = 0.15 + playereyeangle[0] / 90.0;
 	//CPrintToChatAll("x: %.3f", angweightx);
@@ -947,10 +947,28 @@ void GetPlayerData(int iClient)
     float angweighty = GetAngleToTarget(iClient, g_iBot) / 180.0;
 	//CPrintToChatAll("y: %.3f", angweighty);
 
-	Player[0].dist = (Player[0].dist + distweight) / 2;
-	//CPrintToChatAll("dist: %.3f", Player[0].dist);
-	Player[0].x = (Player[0].x + angweightx) / 2;
-	//CPrintToChatAll("x: %.3f", Player[0].x );
-	Player[0].y = (Player[0].y + angweighty) / 2;
-	//CPrintToChatAll("y: %.3f", Player[0].y);
+	g_fPlayerDist = (g_fPlayerDist + distweight) / 2;
+	//CPrintToChatAll("dist: %.3f", g_fPlayerDist);
+	g_fPlayerViewX = (g_fPlayerViewX + angweightx) / 2;
+	//CPrintToChatAll("x: %.3f", g_fPlayerViewX );
+	g_fPlayerViewY = (g_fPlayerViewY + angweighty) / 2;
+	//CPrintToChatAll("y: %.3f", g_fPlayerViewY);
+
+	if (g_fPlayerViewX >= 1.0)
+	{
+		g_fPlayerViewX = 0.99;
+	}
+	else if (g_fPlayerViewX <= 0.0)
+	{
+		g_fPlayerViewX = 0.11;
+	}
+	if (g_fPlayerViewY >= 1.0)
+	{
+		g_fPlayerViewX = 0.99;
+	}
+	else if (g_fPlayerViewY <= 0.0)
+	{
+		g_fPlayerViewX = 0.11;
+	}
+
 }
