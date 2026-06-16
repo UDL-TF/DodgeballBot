@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.6"
+#define PLUGIN_VERSION     "1.1.7"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -196,7 +196,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 // ------------------ [Core function] -----------------------------
 public void OnGameFrame()
 {
-	if (!g_bEnable && g_iBot == -1) return;
+	if (!g_bEnable && g_iBot < 1) return;
 
 	float fBotPosition[3], fRocketPosition[3];
 
@@ -289,14 +289,17 @@ public void OnGameFrame()
 			}
 			else	// Orbit rocket
 			{
-				if (!g_bOrbit)
-					g_bOrbit = true;
+				if (TFDB_GetRocketMphSpeed(iIndex) < g_fOrbitMaxRocketSpeed + 100.0)
+				{
+					if (!g_bOrbit)
+						g_bOrbit = true;
 
-				MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
+					MakeVectorFromPoints(fRocketPosition, fBotPosition, fBotRocket);
 
-				fBotRocket[2] = 0.0;
-				ScaleVector(fBotRocket, 9000.0);
-				TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+					fBotRocket[2] = 0.0;
+					ScaleVector(fBotRocket, 9000.0);
+					TeleportEntity(g_iBot, NULL_VECTOR, NULL_VECTOR, fBotRocket);
+				}
 			}
 		}
 		else
@@ -370,6 +373,8 @@ public void OnGameFrame()
 			}
 		}
 	}
+
+	ChangeClientsTeam();
 }
 
 int FindNextValidRocket(const int &index)
@@ -536,8 +541,6 @@ void EnableMode()
 	if (g_iAutoBalance)
 		ServerCommand("mp_autoteambalance 0");
 
-	ServerCommand("mp_humans_must_join_team %s", g_CvarBotTeam.IntValue == 2 ? "blue" : "red");
-
 	ChangeClientsTeam();	// Changing already joined players teams
 
 	g_bEnable = true;
@@ -549,7 +552,6 @@ void DisableMode()
 {
 	// Restore everything to its default value
 	ServerCommand("tf_bot_pyro_shove_away_range 250");
-	ServerCommand("mp_humans_must_join_team any");
 
 	if (g_CvarKeepServerSettings.BoolValue)
 	{
