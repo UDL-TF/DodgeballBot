@@ -34,6 +34,7 @@ Copy the extra phrases from `extra_translations.txt` into the `tfdb.phrases.txt`
 # Commands
 - sm_pvb : Toggles Player vs. Bot mode.
 - sm_votepvb : Starts a vote to toggle Player vs. Bot mode.
+- sm_pvb_reloadcfg : Reloads the config file.
 
 # Features
 This bot plugin aims to reproduce most of the movement a typical player does, this enables players to practice the playstyle that fits them most.
