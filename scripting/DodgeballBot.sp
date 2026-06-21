@@ -9,7 +9,7 @@
 #define PLUGIN_NAME        "[TFDB] Dodgeball Bot"
 #define PLUGIN_AUTHOR      "Nebula"
 #define PLUGIN_DESCIPTION  "A practice bot for dodgeball."
-#define PLUGIN_VERSION     "1.1.7"
+#define PLUGIN_VERSION     "1.1.8"
 #define PLUGIN_URL         "-"
 
 #define AnalogueTeam(%1) (%1^1)	//https://github.com/Mikah31/TFDB-NerSolo
@@ -41,6 +41,7 @@ float g_fPVBVoteTime = 0.0;
 int g_iStalemate;
 int g_iAutoBalance;
 
+// config variables
 char 	g_strBotName[MAX_NAME_LENGTH];
 int 	g_iDeflectRadiusMin;
 int 	g_iDeflectRadiusMax;
@@ -86,7 +87,7 @@ public void OnPluginStart()
 	g_CvarKeepServerSettings = CreateConVar("tf_dodgeball_reset_changes", "1", "Should the plugin reset changes made to convars, etc. after it's disabled", _, true, 0.0, true, 0.0);
 
 
-	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_Post);
+	HookEvent("player_spawn", OnPlayerSpawn, EventHookMode_PostNoCopy);
 	HookEvent("object_deflected", OnObjectDeflected);
 
 	LoadTranslations("tfdb.phrases.txt");
@@ -96,11 +97,18 @@ public void OnPluginStart()
 
 public void OnConfigsExecuted()
 {
-	if (TFDB_IsDodgeballEnabled() && g_CvarPVBenable.BoolValue)
+	if (TFDB_IsDodgeballEnabled())
 	{
-		ParseConfig();
+		if (g_CvarPVBenable.BoolValue)
+		{
+			ParseConfig();
 
-		g_fPVBVoteTime = 0.0;
+			g_fPVBVoteTime = 0.0;
+		}
+	}
+	else
+	{
+		SetFailState("No dodgeball plugin is detected!");
 	}
 }
 
@@ -196,7 +204,7 @@ public void OnObjectDeflected(Event hEvent, char[] strEventName, bool bDontBroad
 // ------------------ [Core function] -----------------------------
 public void OnGameFrame()
 {
-	if (!g_bEnable && g_iBot < 1) return;
+	if (!g_bEnable || g_iBot == -1) return;
 
 	float fBotPosition[3], fRocketPosition[3];
 
@@ -212,6 +220,8 @@ public void OnGameFrame()
 
 		if (!IsValidClient(g_iBot, true))
 			DisableMode();
+
+		if (g_iBot == -1) return;
 
 		GetClientEyePosition(g_iBot, fBotPosition);
 		GetEntPropVector(iRocket, Prop_Send, "m_vecOrigin", fRocketPosition);
